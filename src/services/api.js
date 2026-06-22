@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1'
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://192.168.0.212:8000/api/v1'
 const ADMIN_KEY = import.meta.env.VITE_ADMIN_API_KEY || 'xuetuxing-dev-key'
 
 async function request(path, options = {}, admin = true) {
