@@ -1,2 +1,54 @@
-<template><div class="page-content settings-page"><div class="content-title"><div><h1>品牌与全局样式</h1><p>统一配置小程序 Logo、品牌文案与主题色</p></div></div><div class="settings-grid"><section class="dash-card form-card"><h3>品牌信息</h3><div class="field"><label>品牌名称</label><input v-model="config.brand.name"></div><div class="field"><label>品牌标语</label><input v-model="config.brand.slogan"></div><div class="field"><label>Logo 文字</label><input v-model="config.brand.logoText" maxlength="1"></div><h3>全局主题色</h3><div class="theme-row" v-for="c in colors" :key="c.key"><div><b>{{c.name}}</b><span>{{c.desc}}</span></div><div class="color-field"><input type="color" v-model="config.brand[c.key]"><input v-model="config.brand[c.key]"></div></div><button class="primary-btn" @click="$emit('save')">保存全局设置</button></section><section class="dash-card brand-preview"><h3>品牌预览</h3><div class="brand-card" :style="{background:`linear-gradient(145deg,${config.brand.dark},${config.brand.secondary})`}"><div class="preview-logo" :style="{background:config.brand.primary}">{{config.brand.logoText}}</div><h2>{{config.brand.name}}</h2><p>{{config.brand.slogan}}</p><button :style="{background:config.brand.primary}">立即开启上岸之旅</button></div><div class="palette"><span v-for="c in colors" :key="c.key" :style="{background:config.brand[c.key]}"><i>{{c.name}}</i></span></div><div class="preview-note">颜色修改会同步作用于装修器的手机预览。发布配置后，可由小程序前端读取并映射到全局主题变量。</div></section></div></div></template>
-<script setup>defineProps({config:Object});defineEmits(['save']);const colors=[{key:'primary',name:'励志橙',desc:'按钮、积分、关键行动'},{key:'secondary',name:'旅行青绿',desc:'旅行、权益、成功状态'},{key:'background',name:'页面底色',desc:'全局页面背景'},{key:'dark',name:'深墨绿',desc:'标题、深色卡片'}]</script>
+<template>
+  <div class="page-content settings-page">
+    <div class="content-title">
+      <div>
+        <h1>品牌与全局样式</h1>
+        <p>统一配置小程序 Logo、品牌文案与主题色</p>
+      </div>
+    </div>
+
+    <div class="settings-grid">
+      <section class="dash-card form-card">
+        <h3>品牌信息</h3>
+        <div class="field"><label>品牌名称</label><input v-model="config.brand.name"></div>
+        <div class="field"><label>品牌标语</label><input v-model="config.brand.slogan"></div>
+        <div class="field"><label>Logo 文字</label><input v-model="config.brand.logoText" maxlength="1"></div>
+
+        <h3>全局主题色</h3>
+        <div class="theme-row" v-for="c in colors" :key="c.key">
+          <div><b>{{ c.name }}</b><span>{{ c.desc }}</span></div>
+          <ColorPicker v-model="config.brand[c.key]" />
+        </div>
+        <button class="primary-btn" @click="$emit('save')">保存全局设置</button>
+      </section>
+
+      <section class="dash-card brand-preview">
+        <h3>品牌预览</h3>
+        <div class="brand-card" :style="{ background: `linear-gradient(145deg,${config.brand.dark},${config.brand.secondary})` }">
+          <div class="preview-logo" :style="{ background: config.brand.primary }">{{ config.brand.logoText }}</div>
+          <h2>{{ config.brand.name }}</h2>
+          <p>{{ config.brand.slogan }}</p>
+          <button :style="{ background: config.brand.primary }">立即开启上岸之旅</button>
+        </div>
+        <div class="palette">
+          <span v-for="c in colors" :key="c.key" :style="{ background: config.brand[c.key] }"><i>{{ c.name }}</i></span>
+        </div>
+        <div class="preview-note">颜色修改会同步作用于装修器的手机预览。发布配置后，可由小程序前端读取并映射到全局主题变量。</div>
+      </section>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import ColorPicker from './ColorPicker.vue'
+
+defineProps({ config: Object })
+defineEmits(['save'])
+
+const colors = [
+  { key: 'primary', name: '励志橙', desc: '按钮、积分、关键行动' },
+  { key: 'secondary', name: '旅行青绿', desc: '旅行、权益、成功状态' },
+  { key: 'background', name: '页面底色', desc: '全局页面背景' },
+  { key: 'dark', name: '深墨绿', desc: '标题、深色卡片' },
+]
+</script>

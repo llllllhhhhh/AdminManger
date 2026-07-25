@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
+    "dev:remote": "vite --host 0.0.0.0 --mode remote",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0"
   },

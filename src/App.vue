@@ -1,5 +1,24 @@
 <template>
-  <div class="app-shell" :style="themeVars">
+  <div v-if="!loggedIn" class="login-shell">
+    <div class="login-card">
+      <div class="login-brand">
+        <div class="brand-logo">行</div>
+        <div>
+          <h1>学徒行管理后台</h1>
+          <p>登录后查看装修、用户、公告与客服数据</p>
+        </div>
+      </div>
+      <form class="login-form" @submit.prevent="submitLogin">
+        <label>账号 / 手机号<input v-model.trim="loginForm.account" placeholder="默认 13800000000"></label>
+        <label>密码<input v-model.trim="loginForm.password" type="password" placeholder="默认 admin123456"></label>
+        <button class="primary-btn" type="submit" :disabled="loading">{{ loading ? '登录中...' : '登录' }}</button>
+      </form>
+      <p class="login-tip">也支持旧的 X-Admin-Key 调试方式，但推荐使用账号登录。</p>
+    </div>
+    <transition name="toast"><div v-if="toastText" class="toast-message"><i>!</i>{{ toastText }}</div></transition>
+  </div>
+
+  <div v-else class="app-shell" :style="themeVars">
     <aside class="sidebar" :class="{ collapsed }">
       <div class="side-brand">
         <div class="brand-logo">{{ config.brand.logoText }}</div>
@@ -7,30 +26,23 @@
           <b>{{ config.brand.name }}</b>
           <span>内容运营中心</span>
         </div>
-        <button @click="collapsed = !collapsed">↔</button>
+        <button @click="collapsed = !collapsed">⇄</button>
       </div>
-
       <nav>
         <template v-for="group in navGroups" :key="group.label">
           <label>{{ group.label }}</label>
-          <button
-            v-for="n in group.items"
-            :key="n.id"
-            :class="{ active: view === n.id }"
-            @click="openView(n.id)"
-          >
+          <button v-for="n in group.items" :key="n.id" :class="{ active: view === n.id }" @click="view = n.id">
             <i>{{ n.icon }}</i>
             <span>{{ n.name }}</span>
             <em v-if="n.badge">{{ n.badge }}</em>
           </button>
         </template>
       </nav>
-
       <div class="side-foot">
         <div class="help-icon">?</div>
         <div>
-          <b>需要帮助？</b>
-          <span>查看后台使用手册</span>
+          <b>已登录</b>
+          <span>{{ adminUser?.nickname || '管理员' }}</span>
         </div>
       </div>
     </aside>
@@ -38,22 +50,21 @@
     <section class="main-shell">
       <header class="top-header">
         <div class="breadcrumb">
-          <span>学徒行运营后台</span>
+          <span>学徒行管理后台</span>
           <i>/</i>
           <b>{{ currentName }}</b>
         </div>
-
         <div class="header-actions">
-          <button class="icon-action" @click="openImport">↥ <small>导入配置</small></button>
-          <button class="icon-action" @click="exportConfig">↧ <small>导出配置</small></button>
-          <button class="icon-round" @click="toast('平台公告与客服消息请到对应模块查看')">✦ <em>3</em></button>
+          <button class="icon-action" @click="openImport">导入<small>配置</small></button>
+          <button class="icon-action" @click="exportConfig">导出<small>配置</small></button>
+          <button class="icon-round" @click="view='announcements'"><em>新</em>🔔</button>
           <div class="admin-user">
-            <div>运营</div>
+            <div>{{ (adminUser?.nickname || '管').slice(0,1) }}</div>
             <span>
-              <b>学徒行管理员</b>
-              <small>超级管理员</small>
+              <b>{{ adminUser?.nickname || '管理员' }}</b>
+              <small>{{ adminUser?.phone || '' }}</small>
             </span>
-            <i>⌄</i>
+            <button class="icon-action" @click="logout">退出</button>
           </div>
         </div>
       </header>
@@ -61,8 +72,7 @@
       <div v-if="view === 'decorator'" class="publish-bar">
         <div>
           <span :class="['save-dot', { dirty }]"></span>
-          {{ dirty ? '存在未保存的装修修改' : '所有修改已保存' }}
-          <small>上次发布：以实际接口返回为准</small>
+          {{ dirty ? '当前有未保存的装修修改' : '所有修改已保存' }}
         </div>
         <div>
           <button @click="resetConfig">恢复默认</button>
@@ -71,57 +81,34 @@
         </div>
       </div>
 
-      <Dashboard v-if="view === 'dashboard'" :config="config" @navigate="openView" />
-      <Decorator
-        v-else-if="view === 'decorator'"
-        :config="config"
-        :active-page="activePage"
-        @toast="toast"
-        @dirty="dirty = true"
-        @page-change="activePage = $event"
-      />
+      <Dashboard v-if="view === 'dashboard'" :config="config" @navigate="view = $event" />
+      <Decorator v-else-if="view === 'decorator'" :config="config" :active-page="activePage" @toast="toast" @dirty="dirty = true" @page-change="activePage = $event" />
       <PageManager v-else-if="view === 'pages'" :config="config" @toast="toast" @decorate="decoratePage" />
       <BrandSettings v-else-if="view === 'brand'" :config="config" @save="save" />
       <RouteManager v-else-if="view === 'routes'" :config="config" @toast="toast" />
+      <TravelMatchSettings v-else-if="view === 'travelMatch'" @toast="toast" />
       <AnnouncementManager v-else-if="view === 'announcements'" @toast="toast" />
+      <ArticleManager v-else-if="view === 'articles'" @toast="toast" />
+      <ContractTemplateManager v-else-if="view === 'contracts'" @toast="toast" />
+      <SchoolSiteManager v-else-if="view === 'schools'" @toast="toast" />
+      <ImageAssetManager v-else-if="view === 'assets'" @toast="toast" />
       <PointsManager v-else-if="view === 'points'" :config="config" @save="save" />
       <OrderManager v-else-if="view === 'orders'" @toast="toast" />
       <PreferenceInsights v-else-if="view === 'preferences'" @toast="toast" />
+      <RegistrationReview v-else-if="view === 'registrations'" @toast="toast" />
+      <StudyCommerceManager v-else-if="view === 'studyCommerce'" @toast="toast" />
+      <UserManager v-else-if="view === 'users'" @toast="toast" />
       <SupportCenter v-else-if="view === 'support'" @toast="toast" />
-
-      <div v-else class="page-content">
-        <div class="empty-state large">
-          <i>◎</i>
-          <h2>{{ currentName }}</h2>
-          <p>该业务模块已预留，可在接入真实后端 API 后继续扩展。</p>
-          <button class="primary-btn compact" @click="view = 'dashboard'">返回数据看板</button>
-        </div>
-      </div>
+      <div v-else class="page-content"><div class="empty-state large"><i>○</i><h2>{{ currentName }}</h2><p>该模块已预留，可继续扩展。</p></div></div>
     </section>
 
-    <transition name="toast">
-      <div v-if="toastText" class="toast-message"><i>✓</i>{{ toastText }}</div>
-    </transition>
+    <transition name="toast"><div v-if="toastText" class="toast-message"><i>✓</i>{{ toastText }}</div></transition>
 
     <div v-if="showImport" class="dialog-mask" @click.self="showImport = false">
       <form class="dialog import-dialog" @submit.prevent="importConfig">
-        <div class="dialog-head">
-          <div>
-            <h2>导入装修配置</h2>
-            <p>粘贴由本后台导出的 JSON 配置</p>
-          </div>
-          <button type="button" @click="showImport = false">×</button>
-        </div>
-
-        <div class="dialog-body">
-          <textarea v-model="importText" placeholder="在这里粘贴 JSON"></textarea>
-          <p class="warning-note">导入会覆盖当前未保存的配置，建议先导出备份。</p>
-        </div>
-
-        <div class="dialog-actions">
-          <button type="button" @click="showImport = false">取消</button>
-          <button class="primary-btn" type="submit">校验并导入</button>
-        </div>
+        <div class="dialog-head"><div><h2>导入装修配置</h2><p>粘贴后台导出的 JSON</p></div><button type="button" @click="showImport = false">×</button></div>
+        <div class="dialog-body"><textarea v-model="importText" placeholder="在这里粘贴 JSON"></textarea></div>
+        <div class="dialog-actions"><button type="button" @click="showImport = false">取消</button><button class="primary-btn" type="submit">导入</button></div>
       </form>
     </div>
   </div>
@@ -135,15 +122,34 @@ import PageManager from './components/PageManager.vue'
 import BrandSettings from './components/BrandSettings.vue'
 import PointsManager from './components/PointsManager.vue'
 import RouteManager from './components/RouteManager.vue'
+import TravelMatchSettings from './components/TravelMatchSettings.vue'
 import AnnouncementManager from './components/AnnouncementManager.vue'
+import ArticleManager from './components/ArticleManager.vue'
+import ContractTemplateManager from './components/ContractTemplateManager.vue'
+import SchoolSiteManager from './components/SchoolSiteManager.vue'
+import ImageAssetManager from './components/ImageAssetManager.vue'
 import OrderManager from './components/OrderManager.vue'
 import PreferenceInsights from './components/PreferenceInsights.vue'
+import RegistrationReview from './components/RegistrationReview.vue'
+import StudyCommerceManager from './components/StudyCommerceManager.vue'
 import SupportCenter from './components/SupportCenter.vue'
-import { cloneDefault } from './data/defaultConfig'
-import { api } from './services/api'
+import UserManager from './components/UserManager.vue'
+import { cloneDefault, mergeDefaultConfig } from './data/defaultConfig'
+import { api, clearAdminSession, getAdminUser, setAdminSession } from './services/api'
 
-const saved = localStorage.getItem('xuetuxing-admin-config')
-const config = ref(saved ? JSON.parse(saved) : cloneDefault())
+const readSavedConfig = () => {
+  const saved = localStorage.getItem('xuetuxing-admin-config')
+  if (!saved) return cloneDefault()
+  try {
+    return mergeDefaultConfig(JSON.parse(saved))
+  } catch (error) {
+    console.warn('装修配置缓存损坏，已自动恢复默认配置', error)
+    localStorage.removeItem('xuetuxing-admin-config')
+    return cloneDefault()
+  }
+}
+
+const config = ref(readSavedConfig())
 const view = ref('dashboard')
 const collapsed = ref(false)
 const dirty = ref(false)
@@ -151,64 +157,28 @@ const toastText = ref('')
 const showImport = ref(false)
 const importText = ref('')
 const activePage = ref('home')
+const loggedIn = ref(!!getAdminUser())
+const adminUser = ref(getAdminUser())
+const loading = ref(false)
+const loginForm = ref({ account: '13800000000', password: 'admin123456' })
 let toastTimer
 
 const navGroups = [
-  {
-    label: '工作台',
-    items: [
-      { id: 'dashboard', name: '数据总览', icon: '◫' },
-      { id: 'decorator', name: '页面装修', icon: '◧' },
-      { id: 'pages', name: '页面管理', icon: '▣' },
-    ],
-  },
-  {
-    label: '内容中心',
-    items: [
-      { id: 'brand', name: '品牌与样式', icon: '✦' },
-      { id: 'routes', name: '旅行路线', icon: '⌘' },
-      { id: 'announcements', name: '平台公告', icon: '🔔' },
-      { id: 'materials', name: '素材中心', icon: '▤' },
-    ],
-  },
-  {
-    label: '业务运营',
-    items: [
-      { id: 'support', name: '在线客服', icon: '◉', badge: 1 },
-      { id: 'points', name: '积分与邀请', icon: '◎' },
-      { id: 'orders', name: '订单审核', icon: '✓', badge: 18 },
-      { id: 'preferences', name: '用户偏好', icon: '◌' },
-    ],
-  },
-  {
-    label: '系统',
-    items: [{ id: 'settings', name: '系统设置', icon: '⚙' }],
-  },
+  { label: '工作台', items: [{ id: 'dashboard', name: '数据总览', icon: '◈' }, { id: 'decorator', name: '页面装修', icon: '▣' }, { id: 'pages', name: '页面管理', icon: '▤' }] },
+  { label: '内容中心', items: [{ id: 'brand', name: '品牌样式', icon: '✦' }, { id: 'routes', name: '旅行路线', icon: '🧭' }, { id: 'travelMatch', name: '智能匹配', icon: '配' }, { id: 'contracts', name: '合同管理', icon: '合' }, { id: 'schools', name: '入驻学校', icon: '校' }, { id: 'announcements', name: '平台公告', icon: '🔔' }, { id: 'articles', name: '文章系统', icon: '文' }] },
+  { label: '用户与运营', items: [{ id: 'users', name: '用户管理', icon: '👤' }, { id: 'support', name: '在线客服', icon: '🎧' }, { id: 'points', name: '积分规则', icon: '🪙' }, { id: 'orders', name: '订单审核', icon: '✓' }, { id: 'preferences', name: '用户偏好', icon: '◎' }] },
 ]
-
+navGroups[2].items.unshift({ id: 'registrations', name: '注册审核', icon: '📝' })
+navGroups[1].items.push({ id: 'studyCommerce', name: '学习产品', icon: '📖' })
+navGroups[1].items.push({ id: 'assets', name: '图片资源', icon: '图' })
 const allItems = navGroups.flatMap(group => group.items)
-const currentName = computed(() => allItems.find(item => item.id === view.value)?.name || '后台管理')
-const themeVars = computed(() => ({
-  '--primary': config.value.brand.primary,
-  '--secondary': config.value.brand.secondary,
-  '--dark': config.value.brand.dark,
-}))
-
-const openView = id => {
-  view.value = id
-}
-
-const decoratePage = id => {
-  activePage.value = id
-  view.value = 'decorator'
-}
+const currentName = computed(() => allItems.find(item => item.id === view.value)?.name || '管理后台')
+const themeVars = computed(() => ({ '--primary': config.value.brand.primary, '--secondary': config.value.brand.secondary, '--dark': config.value.brand.dark }))
 
 const toast = text => {
   toastText.value = text
   clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => {
-    toastText.value = ''
-  }, 2200)
+  toastTimer = setTimeout(() => { toastText.value = '' }, 2200)
 }
 
 const pointPayload = () => ({
@@ -220,43 +190,47 @@ const pointPayload = () => ({
   enabled: config.value.points.enabled,
 })
 
+const submitLogin = async () => {
+  loading.value = true
+  try {
+    const result = await api.adminLogin(loginForm.value)
+    setAdminSession(result)
+    adminUser.value = result.user
+    loggedIn.value = true
+    await loadInitial()
+    toast('登录成功')
+  } catch (error) {
+    toast(error.message || '登录失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+const logout = () => {
+  clearAdminSession()
+  loggedIn.value = false
+  adminUser.value = null
+}
+
 const save = async () => {
   localStorage.setItem('xuetuxing-admin-config', JSON.stringify(config.value))
-  try {
-    await api.saveDraft(config.value)
-    await api.savePointRule(pointPayload())
-    dirty.value = false
-    toast('草稿已保存到 FastAPI / MySQL')
-  } catch {
-    dirty.value = false
-    toast('后端未连接，草稿已保存在当前浏览器')
-  }
+  await api.saveDraft(config.value)
+  await api.savePointRule(pointPayload())
+  dirty.value = false
+  toast('草稿已保存')
 }
 
 const publish = async () => {
-  config.value.pages.forEach(page => {
-    page.status = 'published'
-  })
-  localStorage.setItem(
-    'xuetuxing-published-config',
-    JSON.stringify({ ...config.value, publishedAt: new Date().toISOString() }),
-  )
-  try {
-    await api.publish(config.value)
-    await api.savePointRule(pointPayload())
-    await save()
-    toast('已发布，用户端刷新后生效')
-  } catch {
-    toast('发布接口未连接，已保留本地快照')
-  }
+  await api.publish(config.value)
+  await api.savePointRule(pointPayload())
+  dirty.value = false
+  toast('已发布到用户端')
 }
 
 const resetConfig = () => {
-  if (confirm('确认恢复默认配置吗？当前未保存内容会丢失。')) {
-    config.value = cloneDefault()
-    dirty.value = true
-    toast('已恢复默认配置')
-  }
+  if (!confirm('确认恢复默认配置吗？')) return
+  config.value = cloneDefault()
+  dirty.value = true
 }
 
 const exportConfig = () => {
@@ -266,37 +240,54 @@ const exportConfig = () => {
   link.download = `xuetuxing-config-${new Date().toISOString().slice(0, 10)}.json`
   link.click()
   URL.revokeObjectURL(link.href)
-  toast('配置文件已导出')
 }
 
-const openImport = () => {
-  importText.value = ''
-  showImport.value = true
-}
-
+const openImport = () => { importText.value = ''; showImport.value = true }
 const importConfig = () => {
   try {
     const next = JSON.parse(importText.value)
     if (!next.brand || !Array.isArray(next.pages)) throw new Error('invalid')
-    config.value = next
+    config.value = mergeDefaultConfig(next)
     dirty.value = true
     showImport.value = false
     toast('配置导入成功')
   } catch {
-    toast('配置格式错误，请检查 JSON')
+    toast('配置格式错误')
+  }
+}
+
+const decoratePage = id => {
+  activePage.value = id
+  view.value = 'decorator'
+}
+
+const loadInitial = async () => {
+  try {
+    const draft = await api.getDraft()
+    if (draft.content?.brand) config.value = mergeDefaultConfig(draft.content)
+    const routes = await api.getRoutes()
+    if (routes.length) config.value.routes = routes.map(route => ({
+      ...route,
+      price: Number(route.price),
+      stock: Number(route.stock || 0),
+      display_weight: Number(route.display_weight || 0),
+    }))
+    localStorage.setItem('xuetuxing-admin-config', JSON.stringify(config.value))
+  } catch (error) {
+    toast(error.message || '后端连接失败，当前使用本地缓存')
   }
 }
 
 onMounted(async () => {
-  try {
-    const draft = await api.getDraft()
-    if (draft.content?.brand) config.value = draft.content
-    const routes = await api.getRoutes()
-    if (routes.length) config.value.routes = routes.map(route => ({ ...route, price: Number(route.price) }))
-    localStorage.setItem('xuetuxing-admin-config', JSON.stringify(config.value))
-    toast('已连接 FastAPI 后端')
-  } catch {
-    toast('当前使用本地数据，启动后端后将自动连接')
+  if (loggedIn.value) {
+    try {
+      adminUser.value = await api.adminMe()
+      await loadInitial()
+    } catch {
+      clearAdminSession()
+      loggedIn.value = false
+      adminUser.value = null
+    }
   }
 })
 </script>
