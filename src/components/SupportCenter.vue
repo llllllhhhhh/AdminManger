@@ -200,7 +200,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { api, getSupportWebSocketUrl, resolveApiAssetThumbUrl, resolveApiAssetUrl } from '../services/api'
+import { api, getSupportWebSocket, resolveApiAssetThumbUrl, resolveApiAssetUrl } from '../services/api'
 import { cacheSupportImage, getCachedSupportImage } from '../services/imageCache'
 
 const emit = defineEmits(['toast'])
@@ -340,7 +340,8 @@ const closeSocket = () => {
 const connectSocket = () => {
   if (!selected.value) return
   manualClose = false
-  socket = new WebSocket(getSupportWebSocketUrl(selected.value.id))
+  const { url, protocols } = getSupportWebSocket(selected.value.id)
+  socket = new WebSocket(url, protocols)
   socket.onopen = () => { socketConnected.value = true }
   socket.onmessage = event => {
     let data = null

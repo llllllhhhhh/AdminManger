@@ -181,10 +181,17 @@ export const api = {
   },
 }
 
-export const getSupportWebSocketUrl = id => {
+export const getSupportWebSocket = id => {
   const token = getAdminToken()
   const wsBase = WS_BASE || (API_BASE.startsWith('http')
     ? API_BASE.replace(/^http/, 'ws')
     : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}${API_BASE}`)
-  return `${wsBase}/support/ws/${id}?role=admin&token=${encodeURIComponent(token)}`
+  const url = `${wsBase}/support/ws/${id}?role=admin`
+  // Carry the token in a Sec-WebSocket-Protocol subprotocol instead of the
+  // URL query string so it does not leak into logs/browser history.
+  const protocols = token ? [`bearer.${token}`] : []
+  return { url, protocols }
 }
+
+// Compatibility helper: some callers may still want a plain URL string.
+export const getSupportWebSocketUrl = id => getSupportWebSocket(id).url
