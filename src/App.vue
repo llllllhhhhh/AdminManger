@@ -9,11 +9,23 @@
         </div>
       </div>
       <form class="login-form" @submit.prevent="submitLogin">
-        <label>账号 / 手机号<input v-model.trim="loginForm.account" placeholder="默认 13800000000"></label>
-        <label>密码<input v-model.trim="loginForm.password" type="password" placeholder="默认 admin123456"></label>
+        <label>账号 / 手机号<input v-model.trim="loginForm.account" autocomplete="username" placeholder="请输入管理员账号"></label>
+        <label>密码<input v-model.trim="loginForm.password" type="password" autocomplete="current-password" placeholder="请输入管理员密码"></label>
         <button class="primary-btn" type="submit" :disabled="loading">{{ loading ? '登录中...' : '登录' }}</button>
       </form>
-      <p class="login-tip">也支持旧的 X-Admin-Key 调试方式，但推荐使用账号登录。</p>
+      <p class="login-tip">管理操作必须使用管理员账号登录。</p>
+    </div>
+    <div v-if="showSlider" class="slider-modal-mask" @click.self="closeSlider">
+      <div class="slider-modal">
+        <div class="slider-modal-head">
+          <div>
+            <h2>登录安全验证</h2>
+            <p>完成滑块后将自动登录后台。</p>
+          </div>
+          <button type="button" @click="closeSlider">×</button>
+        </div>
+        <SliderCaptcha ref="sliderRef" scope="admin" @verified="handleSliderVerified" @reset="sliderTicket = ''" @toast="toast" />
+      </div>
     </div>
     <transition name="toast"><div v-if="toastText" class="toast-message"><i>!</i>{{ toastText }}</div></transition>
   </div>
@@ -31,7 +43,7 @@
       <nav>
         <template v-for="group in navGroups" :key="group.label">
           <label>{{ group.label }}</label>
-          <button v-for="n in group.items" :key="n.id" :class="{ active: view === n.id }" @click="view = n.id">
+          <button v-for="n in group.items" :key="n.id" :class="{ active: view === n.id }" @click="navigate(n.id)">
             <i>{{ n.icon }}</i>
             <span>{{ n.name }}</span>
             <em v-if="n.badge">{{ n.badge }}</em>
@@ -57,7 +69,7 @@
         <div class="header-actions">
           <button class="icon-action" @click="openImport">导入<small>配置</small></button>
           <button class="icon-action" @click="exportConfig">导出<small>配置</small></button>
-          <button class="icon-round" @click="view='announcements'"><em>新</em>🔔</button>
+          <button class="icon-round" @click="navigate('announcements')"><em>新</em>🔔</button>
           <div class="admin-user">
             <div>{{ (adminUser?.nickname || '管').slice(0,1) }}</div>
             <span>
@@ -81,12 +93,13 @@
         </div>
       </div>
 
-      <Dashboard v-if="view === 'dashboard'" :config="config" @navigate="view = $event" />
-      <Decorator v-else-if="view === 'decorator'" :config="config" :active-page="activePage" @toast="toast" @dirty="dirty = true" @page-change="activePage = $event" />
-      <PageManager v-else-if="view === 'pages'" :config="config" @toast="toast" @decorate="decoratePage" />
+      <Dashboard v-if="view === 'dashboard'" :config="config" @navigate="navigate" />
+      <Decorator v-else-if="view === 'decorator'" :config="config" @toast="toast" @dirty="dirty = true" />
       <BrandSettings v-else-if="view === 'brand'" :config="config" @save="save" />
       <RouteManager v-else-if="view === 'routes'" :config="config" @toast="toast" />
       <TravelMatchSettings v-else-if="view === 'travelMatch'" @toast="toast" />
+      <OnboardingSettings v-else-if="view === 'onboarding'" :config="config" @save="save" @publish="publish" @dirty="dirty = true" @toast="toast" />
+      <SliderCaptchaSettings v-else-if="view === 'sliderCaptcha'" @toast="toast" />
       <AnnouncementManager v-else-if="view === 'announcements'" @toast="toast" />
       <ArticleManager v-else-if="view === 'articles'" @toast="toast" />
       <ContractTemplateManager v-else-if="view === 'contracts'" @toast="toast" />
@@ -115,14 +128,16 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import Dashboard from './components/Dashboard.vue'
 import Decorator from './components/Decorator.vue'
-import PageManager from './components/PageManager.vue'
 import BrandSettings from './components/BrandSettings.vue'
 import PointsManager from './components/PointsManager.vue'
 import RouteManager from './components/RouteManager.vue'
 import TravelMatchSettings from './components/TravelMatchSettings.vue'
+import OnboardingSettings from './components/OnboardingSettings.vue'
+import SliderCaptcha from './components/SliderCaptcha.vue'
+import SliderCaptchaSettings from './components/SliderCaptchaSettings.vue'
 import AnnouncementManager from './components/AnnouncementManager.vue'
 import ArticleManager from './components/ArticleManager.vue'
 import ContractTemplateManager from './components/ContractTemplateManager.vue'
@@ -156,21 +171,25 @@ const dirty = ref(false)
 const toastText = ref('')
 const showImport = ref(false)
 const importText = ref('')
-const activePage = ref('home')
 const loggedIn = ref(!!getAdminUser())
 const adminUser = ref(getAdminUser())
 const loading = ref(false)
-const loginForm = ref({ account: '13800000000', password: 'admin123456' })
+const loginForm = ref({ account: '', password: '' })
+const sliderTicket = ref('')
+const sliderRef = ref(null)
+const showSlider = ref(false)
 let toastTimer
 
 const navGroups = [
-  { label: '工作台', items: [{ id: 'dashboard', name: '数据总览', icon: '◈' }, { id: 'decorator', name: '页面装修', icon: '▣' }, { id: 'pages', name: '页面管理', icon: '▤' }] },
+  { label: '工作台', items: [{ id: 'dashboard', name: '数据总览', icon: '◈' }, { id: 'decorator', name: '首页装修', icon: '▣' }] },
   { label: '内容中心', items: [{ id: 'brand', name: '品牌样式', icon: '✦' }, { id: 'routes', name: '旅行路线', icon: '🧭' }, { id: 'travelMatch', name: '智能匹配', icon: '配' }, { id: 'contracts', name: '合同管理', icon: '合' }, { id: 'schools', name: '入驻学校', icon: '校' }, { id: 'announcements', name: '平台公告', icon: '🔔' }, { id: 'articles', name: '文章系统', icon: '文' }] },
   { label: '用户与运营', items: [{ id: 'users', name: '用户管理', icon: '👤' }, { id: 'support', name: '在线客服', icon: '🎧' }, { id: 'points', name: '积分规则', icon: '🪙' }, { id: 'orders', name: '订单审核', icon: '✓' }, { id: 'preferences', name: '用户偏好', icon: '◎' }] },
 ]
 navGroups[2].items.unshift({ id: 'registrations', name: '注册审核', icon: '📝' })
 navGroups[1].items.push({ id: 'studyCommerce', name: '学习产品', icon: '📖' })
 navGroups[1].items.push({ id: 'assets', name: '图片资源', icon: '图' })
+navGroups[1].items.push({ id: 'onboarding', name: '开屏引导', icon: '引' })
+navGroups[1].items.push({ id: 'sliderCaptcha', name: '登录滑块', icon: '验' })
 const allItems = navGroups.flatMap(group => group.items)
 const currentName = computed(() => allItems.find(item => item.id === view.value)?.name || '管理后台')
 const themeVars = computed(() => ({ '--primary': config.value.brand.primary, '--secondary': config.value.brand.secondary, '--dark': config.value.brand.dark }))
@@ -181,29 +200,63 @@ const toast = text => {
   toastTimer = setTimeout(() => { toastText.value = '' }, 2200)
 }
 
+const navigate = target => {
+  if (target === view.value) return
+  if (dirty.value && !confirm('当前装修修改尚未保存，确认离开吗？')) return
+  view.value = target
+}
+
+const warnBeforeUnload = event => {
+  if (!dirty.value) return
+  event.preventDefault()
+  event.returnValue = ''
+}
+
 const pointPayload = () => ({
   invite_score: config.value.points.inviteScore,
+  checkin_score: config.value.points.checkinScore,
+  purchase_score: config.value.points.purchaseScore,
   exchange_score: config.value.points.exchangeScore,
   valid_days: config.value.points.validDays,
   yearly_limit: config.value.points.yearlyLimit,
   monthly_stock: config.value.points.monthlyStock,
+  invite_enabled: config.value.points.inviteEnabled,
+  checkin_enabled: config.value.points.checkinEnabled,
+  purchase_enabled: config.value.points.purchaseEnabled,
   enabled: config.value.points.enabled,
 })
 
 const submitLogin = async () => {
+  if (!sliderTicket.value) {
+    showSlider.value = true
+    return
+  }
   loading.value = true
   try {
-    const result = await api.adminLogin(loginForm.value)
+    const result = await api.adminLogin({ ...loginForm.value, slider_ticket: sliderTicket.value })
     setAdminSession(result)
     adminUser.value = result.user
     loggedIn.value = true
     await loadInitial()
     toast('登录成功')
   } catch (error) {
+    sliderTicket.value = ''
+    showSlider.value = false
     toast(error.message || '登录失败')
   } finally {
     loading.value = false
   }
+}
+
+const closeSlider = () => {
+  showSlider.value = false
+  sliderTicket.value = ''
+}
+
+const handleSliderVerified = ticket => {
+  sliderTicket.value = ticket
+  showSlider.value = false
+  submitLogin()
 }
 
 const logout = () => {
@@ -256,11 +309,6 @@ const importConfig = () => {
   }
 }
 
-const decoratePage = id => {
-  activePage.value = id
-  view.value = 'decorator'
-}
-
 const loadInitial = async () => {
   try {
     const draft = await api.getDraft()
@@ -272,6 +320,21 @@ const loadInitial = async () => {
       stock: Number(route.stock || 0),
       display_weight: Number(route.display_weight || 0),
     }))
+    const pointRule = await api.getPointRule()
+    config.value.points = {
+      ...config.value.points,
+      inviteScore: Number(pointRule.invite_score ?? config.value.points.inviteScore),
+      checkinScore: Number(pointRule.checkin_score ?? config.value.points.checkinScore),
+      purchaseScore: Number(pointRule.purchase_score ?? config.value.points.purchaseScore),
+      exchangeScore: Number(pointRule.exchange_score ?? config.value.points.exchangeScore),
+      validDays: Number(pointRule.valid_days ?? config.value.points.validDays),
+      yearlyLimit: Number(pointRule.yearly_limit ?? config.value.points.yearlyLimit),
+      monthlyStock: Number(pointRule.monthly_stock ?? config.value.points.monthlyStock),
+      inviteEnabled: pointRule.invite_enabled ?? config.value.points.inviteEnabled,
+      checkinEnabled: pointRule.checkin_enabled ?? config.value.points.checkinEnabled,
+      purchaseEnabled: pointRule.purchase_enabled ?? config.value.points.purchaseEnabled,
+      enabled: pointRule.enabled ?? config.value.points.enabled,
+    }
     localStorage.setItem('xuetuxing-admin-config', JSON.stringify(config.value))
   } catch (error) {
     toast(error.message || '后端连接失败，当前使用本地缓存')
@@ -279,6 +342,7 @@ const loadInitial = async () => {
 }
 
 onMounted(async () => {
+  window.addEventListener('beforeunload', warnBeforeUnload)
   if (loggedIn.value) {
     try {
       adminUser.value = await api.adminMe()
@@ -290,4 +354,14 @@ onMounted(async () => {
     }
   }
 })
+onBeforeUnmount(() => window.removeEventListener('beforeunload', warnBeforeUnload))
 </script>
+
+<style scoped>
+.slider-modal-mask{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(15,23,42,.42);backdrop-filter:blur(8px)}
+.slider-modal{width:min(420px,100%);padding:18px;border-radius:18px;background:#fff;box-shadow:0 28px 80px rgba(15,23,42,.28)}
+.slider-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}
+.slider-modal-head h2{margin:0;color:#172033;font-size:19px}
+.slider-modal-head p{margin:4px 0 0;color:#788397;font-size:13px}
+.slider-modal-head button{width:34px;height:34px;border:0;border-radius:50%;background:#f1f5f9;color:#475569;font-size:22px;font-weight:800;line-height:1}
+</style>

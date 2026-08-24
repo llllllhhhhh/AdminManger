@@ -33,7 +33,7 @@
 
         <div class="x-color-hex">
           <span>Hex:</span>
-          <input v-model="hexInput" @change="setFromHex(hexInput)" />
+          <input v-model="hexInput" @input="applyHexInput" @change="setFromHex(hexInput)" />
           <i :style="{ background: previewColor }"></i>
         </div>
 
@@ -180,6 +180,9 @@ const emitColor = () => {
 const setFromHex = color => {
   readColor(color)
   emitColor()
+}
+const applyHexInput = () => {
+  if (/^#[0-9a-f]{6}$/i.test(hexInput.value)) setFromHex(hexInput.value)
 }
 const syncFromHsv = () => {
   Object.assign(rgba, hsvToRgb(hue.value, saturation.value, value.value))

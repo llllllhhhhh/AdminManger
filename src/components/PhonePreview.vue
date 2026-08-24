@@ -71,8 +71,7 @@
               <div class="pv-task"><span>● 阶段规划服务</span><em>去查看 →</em></div>
             </div>
 
-            <div v-else-if="block.type === 'smart'" class="pv-smart pv-section" :class="{ 'has-bg-image': !!previewImage(block) }" :style="smartStyle(block)">
-              <span v-if="smartIcon(block)" class="pv-smart-icon" :style="{ color: block.iconColor || block.textColor || '' }">{{ smartIcon(block) }}</span>
+            <div v-else-if="block.type === 'smart'" class="pv-smart pv-section" :style="smartStyle(block)">
               <div>
                 <small :style="{ color: block.labelColor || block.textColor || '' }">{{ block.label || 'AI 智能匹配' }}</small>
                 <h4 :style="{ color: block.titleColor || '' }">{{ block.title }}</h4>
@@ -208,10 +207,9 @@ const shadowMap = {
   strong: '0 8px 22px rgba(25,56,51,.13)',
 }
 const previewImage = block => Array.isArray(block?.images) && block.images[0] ? block.images[0] : block?.image || ''
-const smartIcon = block => block && Object.prototype.hasOwnProperty.call(block, 'icon') ? String(block.icon || '').trim() : '✦'
 const sectionStyle = (block, fallback = '#fff') => ({
   background: block?.background || fallback,
-  borderRadius: `${Number(block?.radius || 12)}px`,
+  borderRadius: '12px',
   padding: `${Math.max(4, Math.round(Number(block?.padding || 28) / 2.5))}px`,
   boxShadow: shadowMap[block?.shadow] || undefined,
 })
@@ -220,24 +218,19 @@ const buttonStyle = block => ({
 })
 const bannerStyle = block => ({
   ...bgImage(block),
-  borderRadius: `${Math.max(4, Math.round(Number(block?.radius || 30) / 2.2))}px`,
+  borderRadius: '14px',
   height: `${Math.max(90, Math.round(Number(block?.height || 330) / 2.3))}px`,
 })
 const videoStyle = block => ({
   ...bgImage(block),
   height: `${Math.max(80, Math.round(Number(block?.video_height || 330) / 3))}px`,
-  borderRadius: `${Math.max(4, Math.round(Number(block?.radius || 24) / 2.5))}px`,
+  borderRadius: '9px',
 })
-const smartStyle = block => {
-  const style = sectionStyle(block, '#dff5ef')
-  const image = previewImage(block)
-  if (image) {
-    style.backgroundImage = `url('${image}')`
-    style.backgroundSize = 'cover'
-    style.backgroundPosition = 'center'
-  }
-  return style
-}
+const smartStyle = block => ({
+  ...sectionStyle(block, '#eef8f5'),
+  border: '1px solid #d7e9e4',
+  boxShadow: '0 6px 18px rgba(23,63,56,.07)',
+})
 const bannerHotZones = block => Array.isArray(block?.hotZones) ? block.hotZones : []
 const gridItems = block => {
   const list = Array.isArray(block?.gridItems) ? block.gridItems : block?.items || []

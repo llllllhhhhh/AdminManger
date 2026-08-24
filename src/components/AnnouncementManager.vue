@@ -154,7 +154,12 @@ const formatWindow = item => {
 }
 
 const load = async () => {
-  list.value = await api.getAnnouncements()
+  try {
+    list.value = await api.getAnnouncements()
+  } catch (error) {
+    list.value = []
+    emit('toast', error.message || '公告列表加载失败')
+  }
 }
 
 const openCreate = () => {
@@ -195,16 +200,24 @@ const buildPayload = () => ({
 })
 
 const submit = async () => {
-  const payload = buildPayload()
-  if (form.value.id) {
-    await api.updateAnnouncement({ id: form.value.id, ...payload })
-    emit('toast', '公告已更新')
-  } else {
-    await api.createAnnouncement(payload)
-    emit('toast', '公告已创建')
+  if (form.value.start_at && form.value.end_at && new Date(form.value.end_at) < new Date(form.value.start_at)) {
+    emit('toast', '结束时间不能早于开始时间')
+    return
   }
-  showDialog.value = false
-  await load()
+  const payload = buildPayload()
+  try {
+    if (form.value.id) {
+      await api.updateAnnouncement({ id: form.value.id, ...payload })
+      emit('toast', '公告已更新')
+    } else {
+      await api.createAnnouncement(payload)
+      emit('toast', '公告已创建')
+    }
+    showDialog.value = false
+    await load()
+  } catch (error) {
+    emit('toast', error.message || '公告保存失败')
+  }
 }
 
 const toggleStatus = async item => {

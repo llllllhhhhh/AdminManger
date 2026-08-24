@@ -67,5 +67,85 @@
 
 /* 留白组件预览只保留空间，不显示占位纹理 */
 .pv-spacer{border:0!important;background:transparent!important;margin-bottom:0!important}
+/* 首页装修工作台 */
+.decorator{grid-template-columns:220px minmax(420px,1fr) 330px;background:#eef2f1}
+.decorator .panel{position:relative;z-index:2}
+.decorator .panel-heading{height:78px;padding:0 20px;border-color:#e8edeb}
+.decorator .panel-heading b{font-size:14px;color:#18312d}
+.decorator .panel-heading small{font-size:10px;line-height:1.45;margin-top:5px}
+.decorator-heading .drag-ready{padding:4px 8px;border-radius:6px;background:#edf7f4;color:#087f70;font-weight:700}
+.decorator .component-list{padding:10px 12px 24px}
+.component-group{padding:10px 0 14px;border-bottom:1px solid #edf1ef}
+.component-group:last-child{border-bottom:0}
+.component-group-title{height:28px;padding:0 5px;display:flex;align-items:center;justify-content:space-between}
+.component-group-title b{font-size:10px;color:#647773;font-weight:700}
+.component-group-title span{font-size:9px;color:#a0aca9}
+.decorator .component-list button{height:62px;margin:5px 0 0;padding:0 10px;border:1px solid transparent;border-radius:7px;background:#f7f9f8;gap:10px;box-shadow:none}
+.decorator .component-list button:hover{border-color:#b8dcd4;background:#fff;box-shadow:0 6px 16px rgba(25,56,51,.07);transform:translateY(-1px)}
+.decorator .component-list button>i{width:35px;height:35px;border-radius:7px;background:#e7f3f0;color:#147d70;font-size:15px}
+.decorator .component-list button b{font-size:11px;color:#243d38}
+.decorator .component-list button small{max-width:125px;font-size:8px;line-height:1.45;color:#879692;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.decorator .component-list button em{width:22px;height:22px;border:1px solid #dce6e3;border-radius:6px;display:grid;place-items:center;color:#69807a;background:#fff;font-size:13px}
+.canvas-panel{min-width:0}
+.decorator .canvas-toolbar{height:78px;padding:0 22px;border-color:#e1e8e5}
+.home-page-identity{gap:11px}
+.home-page-identity>i{width:34px;height:34px;border-radius:7px;display:grid;place-items:center;background:#173f38;color:#fff;font-style:normal;font-size:12px;font-weight:800}
+.home-page-identity>div small,.home-page-identity>div b{display:block}
+.home-page-identity>div small{font-size:9px;color:#8c9996;margin-bottom:2px}
+.home-page-identity>div b{font-size:12px;color:#17342f}
+.home-page-identity>span{margin-left:4px;padding-left:12px;border-left:1px solid #e0e7e4;font-size:9px;color:#8a9995}
+.canvas-guide{display:flex;align-items:center;gap:7px;font-size:9px;color:#7a8b87}
+.canvas-guide i{width:7px;height:7px;border-radius:50%;background:#18a08f;box-shadow:0 0 0 4px #e4f5f1}
+.decorator .canvas-area{gap:20px;padding:24px 20px 40px;background-image:linear-gradient(#e4eae8 1px,transparent 1px),linear-gradient(90deg,#e4eae8 1px,transparent 1px);background-size:24px 24px;background-position:-1px -1px}
+.decorator .block-rail{width:165px;background:rgba(255,255,255,.92);border:1px solid #dfe7e4;border-radius:8px;padding:10px;box-shadow:0 10px 25px rgba(23,52,47,.07)}
+.decorator .rail-caption{height:34px;margin:0 2px 8px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #edf1ef}
+.decorator .rail-caption b{font-size:10px;color:#314944}
+.decorator .rail-caption span{font-size:8px;color:#8d9a97}
+.decorator .rail-item{height:54px;margin-bottom:7px;padding:0 7px;border-color:transparent;background:#f6f8f7;border-radius:6px;gap:7px}
+.decorator .rail-item:hover{background:#eef5f3;border-color:#dbe7e3}
+.decorator .rail-item.active{background:#eaf6f3;border-color:#72b9aa;box-shadow:inset 3px 0 0 #138c7d;color:#173f38}
+.decorator .rail-item.muted{opacity:.62}
+.decorator .rail-item .rail-order{width:18px;color:#96a29f;font-size:8px}
+.decorator .rail-item>i{width:25px;height:25px;border-radius:6px;background:#fff;color:#177d70;display:grid;place-items:center;font-style:normal;font-size:10px;box-shadow:0 1px 4px rgba(22,52,47,.07)}
+.decorator .rail-item>div{flex:1;min-width:0}
+.decorator .rail-item>div b,.decorator .rail-item>div small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.decorator .rail-item>div b{font-size:9px;color:#2c443f}
+.decorator .rail-item>div small{margin-top:3px;font-size:7px;color:#91a09c}
+.decorator .rail-item>em{font-style:normal;font-size:7px;color:#138c7d}
+.decorator .rail-item>em.off{color:#9ba6a3}
+.decorator .rail-drop-end{padding:9px 5px;border-radius:6px;background:#fbfcfc}
+.property-panel{box-shadow:-6px 0 20px rgba(23,52,47,.035)}
+.decorator .property-heading{justify-content:flex-start;gap:10px;padding:0 18px}
+.selected-module-icon{width:36px;height:36px;flex:0 0 36px;border-radius:7px;background:#e8f4f1;color:#137e70;display:grid;place-items:center;font-size:15px}
+.decorator .property-heading>div:nth-child(2){min-width:0;flex:1}
+.decorator .property-heading>div:nth-child(2) small{margin:0 0 2px}
+.decorator .property-heading>div:nth-child(2) b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.decorator .property-heading em{display:inline-block;margin-top:3px;color:#879692;font-size:8px;font-style:normal}
+.decorator .property-scroll{padding:22px 20px 30px;scrollbar-width:thin;scrollbar-color:#ccd9d5 transparent}
+.decorator .field{margin-bottom:22px}
+.decorator .field>label{margin-bottom:9px;font-size:10px;color:#3d5550}
+.decorator .field input:not([type=range]):not([type=color]),.decorator .field textarea,.decorator .field select{min-height:38px;padding:9px 11px;border-color:#dce5e2;border-radius:7px;background:#fbfcfc;font-size:10px;transition:border-color .15s,box-shadow .15s,background .15s}
+.decorator .field textarea{height:78px;line-height:1.6}
+.decorator .field input:focus,.decorator .field textarea:focus,.decorator .field select:focus{background:#fff;border-color:#69b8a9;box-shadow:0 0 0 3px rgba(18,165,148,.1)}
+.decorator .field-help{margin-top:8px;font-size:8px;line-height:1.65}
+.decorator .advanced-style,.decorator .button-setting{padding:14px;border-radius:8px}
+.decorator .image-preview,.decorator .hotzone-preview{border-radius:7px}
+.decorator .dash-btn{min-height:34px;border-radius:7px;background:#f8faf9;color:#397069}
+.decorator .property-actions{height:66px;padding:11px 16px;gap:8px;background:#fff}
+.decorator .property-actions button{border-radius:7px;font-size:10px}
+.decorator .property-actions button:hover:not(:disabled){border-color:#9fc9c0;background:#f3f9f7}
+.decorator .property-actions button.danger:hover:not(:disabled){border-color:#edbaba;background:#fff4f4}
 
+@media(max-width:1440px){
+  .decorator{grid-template-columns:210px minmax(390px,1fr) 320px}
+  .decorator .block-rail{display:none}
+  .decorator .canvas-area{padding-left:16px;padding-right:16px}
+}
+
+/* 智能定制入口 */
+.pv-smart{display:flex;align-items:center;gap:10px;min-height:76px}
+.pv-smart>div{flex:1;min-width:0}
+.pv-smart small{display:block;margin-bottom:3px;font-size:7px;font-weight:700;color:#128c7e}
+.pv-smart h4{margin:0 0 4px;font-size:10px;line-height:1.35}
+.pv-smart p{line-height:1.45}
 

@@ -221,6 +221,8 @@ let socket = null
 let pollTimer = null
 let reconnectTimer = null
 let manualClose = false
+let conversationsRequestId = 0
+let conversationSelectionId = 0
 
 const openCount = computed(() => conversations.value.filter(c => c.status === 'open').length)
 const formatConversationPreview = value => {
@@ -311,8 +313,10 @@ const hydrateImageMessage = message => {
 const hydrateImageMessages = list => list.map(item => hydrateImageMessage(item))
 
 const loadConversations = async () => {
+  const requestId = ++conversationsRequestId
   try {
     const list = await api.getSupportConversations()
+    if (requestId !== conversationsRequestId) return
     conversations.value = list
     if (selected.value) {
       const fresh = list.find(c => c.id === selected.value.id)
@@ -347,8 +351,9 @@ const connectSocket = () => {
         if (incoming.message_type === 'image' && incoming.sender_role === 'admin') {
           const pending = messages.value.find(m => m.local_pending && m.sender_role === 'admin')
           if (pending) {
+            if (pending.local_preview?.startsWith('blob:')) URL.revokeObjectURL(pending.local_preview)
             Object.assign(pending, incoming, {
-              local_preview: pending.local_preview,
+              local_preview: '',
               local_pending: false,
               uploading: false,
             })
@@ -383,14 +388,19 @@ const connectSocket = () => {
 }
 
 const selectConversation = async conversation => {
+  const selectionId = ++conversationSelectionId
   closeSocket()
   selected.value = { ...conversation }
   typingRole.value = ''
   try {
-    messages.value = hydrateImageMessages(await api.getSupportMessages(conversation.id))
+    const nextMessages = hydrateImageMessages(await api.getSupportMessages(conversation.id))
+    if (selectionId !== conversationSelectionId || selected.value?.id !== conversation.id) return
+    messages.value = nextMessages
   } catch {
+    if (selectionId !== conversationSelectionId) return
     messages.value = []
   }
+  if (selectionId !== conversationSelectionId || selected.value?.id !== conversation.id) return
   connectSocket()
   scrollBottom()
 }
@@ -406,9 +416,11 @@ const insertQuick = text => { content.value = text }
 const uploadImage = async event => {
   const file = event.target.files?.[0]
   if (!file || !selected.value) return
+  let pendingMessage = null
+  let previewUrl = ''
   try {
-    const previewUrl = URL.createObjectURL(file)
-    const pendingMessage = {
+    previewUrl = URL.createObjectURL(file)
+    pendingMessage = {
       id: `local-admin-${Date.now()}`,
       sender_role: 'admin',
       sender_name: '平台客服',
@@ -428,7 +440,8 @@ const uploadImage = async event => {
       image_thumb_url: result.thumb_url || result.url,
       resolved_image_url: result.thumb_url ? resolveApiAssetUrl(result.thumb_url) : resolveApiAssetThumbUrl(result.url),
     })
-    socket?.send(JSON.stringify({
+    if (!socket || socket.readyState !== WebSocket.OPEN) throw new Error('客服连接已断开，请稍后重试')
+    socket.send(JSON.stringify({
       type: 'message',
       message_type: 'image',
       image_url: result.url,
@@ -436,6 +449,8 @@ const uploadImage = async event => {
       content: '',
     }))
   } catch (error) {
+    if (pendingMessage) messages.value = messages.value.filter(item => item !== pendingMessage)
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
     emit('toast', error.message || '图片上传失败')
   } finally {
     event.target.value = ''
@@ -461,6 +476,9 @@ onMounted(() => {
 onUnmounted(() => {
   clearInterval(pollTimer)
   closeSocket()
+  messages.value.forEach(message => {
+    if (message.local_preview?.startsWith('blob:')) URL.revokeObjectURL(message.local_preview)
+  })
 })
 </script>
 

@@ -4,7 +4,7 @@
       <div>
         <span class="admin-grid-eyebrow">用户管理</span>
         <h1>用户管理</h1>
-        <p>查看用户详情、录取通知书认证、客服状态，并支持账户停用、注销和密码管理。</p>
+        <p>查看用户详情、学生证认证、客服状态，并支持账户停用、注销和密码管理。</p>
       </div>
       <button class="ghost-btn compact" @click="load">刷新</button>
     </div>
@@ -32,7 +32,7 @@
               <th>用户 <button>⋮</button></th>
               <th>手机号 <button>⋮</button></th>
               <th>积分 / 余额 <button>⋮</button></th>
-              <th>通知书认证 <button>⋮</button></th>
+              <th>学生证认证 <button>⋮</button></th>
               <th>客服情况 <button>⋮</button></th>
               <th>最近登录 <button>⋮</button></th>
               <th>操作</th>
@@ -83,7 +83,7 @@
               <td><b>{{ user.points }} 积分</b><small>余额 ¥{{ money(user.balance) }} · {{ user.exam_status }}</small></td>
               <td>
                 <span :class="['admin-grid-pill', certClass(user.graduation_status)]">{{ graduationText(user.graduation_status) }}</span>
-                <small>录取通知书</small>
+                <small>学生证</small>
               </td>
               <td><b>{{ user.conversation_count }} 次会话</b><small>{{ user.open_conversation ? '当前有进行中会话' : '当前无进行中会话' }}</small></td>
               <td><b>{{ format(user.last_login_at) }}</b><small>创建于 {{ format(user.created_at) }}</small></td>
@@ -136,25 +136,24 @@
           <section class="detail-section certificate-section">
             <div class="detail-section-head">
               <div>
-                <b>录取通知书认证</b>
-                <small>人工核验用户提交的录取信息和通知书图片</small>
+                <b>学生证认证</b>
+                <small>人工核验用户提交的学生身份信息和学生证图片</small>
               </div>
               <span :class="['admin-grid-pill', certClass(certificate?.status)]">{{ graduationText(certificate?.status) }}</span>
             </div>
 
-            <div v-if="!certificate" class="certificate-empty">该用户尚未提交录取通知书认证。</div>
+            <div v-if="!certificate" class="certificate-empty">该用户尚未提交学生证认证。</div>
             <template v-else>
               <div class="certificate-layout">
                 <a class="certificate-image" :href="resolveApiAssetUrl(certificate.certificate_image)" target="_blank" rel="noopener">
-                  <img :src="resolveApiAssetUrl(certificate.certificate_image)" alt="用户上传的录取通知书">
+                  <img :src="resolveApiAssetUrl(certificate.certificate_image)" alt="用户上传的学生证">
                   <span>点击查看原图</span>
                 </a>
                 <div class="certificate-info">
                   <label><span>真实姓名</span><b>{{ certificate.real_name }}</b></label>
                   <label><span>录取院校</span><b>{{ certificate.school_name }}</b></label>
                   <label><span>录取专业</span><b>{{ certificate.major_name || '未填写' }}</b></label>
-                  <label><span>通知书日期</span><b>{{ certificate.graduation_date || '未填写' }}</b></label>
-                  <label><span>通知书编号 / 考生号</span><b>{{ certificate.certificate_no || '未填写' }}</b></label>
+                  <label><span>学生证号</span><b>{{ certificate.certificate_no || '未填写' }}</b></label>
                   <label><span>提交时间</span><b>{{ format(certificate.updated_at) }}</b></label>
                 </div>
               </div>
@@ -315,9 +314,9 @@ const statusText = status => ({ active: '正常', pending: '待审核', disabled
 const statusPillClass = status => (status === 'active' ? 'green' : status === 'disabled' || status === 'cancelled' || status === 'rejected' ? 'red' : 'orange')
 const graduationText = status => ({
   not_submitted: '未提交认证',
-  pending: '通知书待审核',
-  approved: '通知书已认证',
-  rejected: '通知书已驳回',
+  pending: '学生证待审核',
+  approved: '学生证已认证',
+  rejected: '学生证已驳回',
 }[status || 'not_submitted'])
 const certClass = status => ({ pending: 'orange', approved: 'green', rejected: 'red', not_submitted: 'gray' }[status || 'not_submitted'])
 
@@ -364,14 +363,14 @@ const reviewCertificate = async approved => {
     return
   }
   const action = approved ? '通过' : '驳回'
-  if (!confirm(`确认${action}该用户的录取通知书认证吗？`)) return
+  if (!confirm(`确认${action}该用户的学生证认证吗？`)) return
   try {
     activeDetail.value = await api.reviewGraduation(activeDetail.value.user.id, approved, reviewReason.value)
     updateRow(activeDetail.value.user)
     reviewReason.value = ''
-    emit('toast', `录取通知书认证已${action}`)
+    emit('toast', `学生证认证已${action}`)
   } catch (error) {
-    emit('toast', error.message || '录取通知书审核失败')
+    emit('toast', error.message || '学生证审核失败')
   }
 }
 

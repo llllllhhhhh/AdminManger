@@ -1,48 +1,42 @@
 <template>
   <div class="decorator">
     <section class="component-panel panel">
-      <div class="panel-heading">
-        <div><b>组件库</b><small>拖动组件到手机画布</small></div>
-        <span class="drag-ready">可拖拽</span>
+      <div class="panel-heading decorator-heading">
+        <div><b>装修模块</b><small>点击添加，按住可拖入预览</small></div>
+        <span class="drag-ready">{{ componentCatalog.length }} 个</span>
       </div>
       <div class="component-list">
-        <button
-          v-for="item in componentCatalog"
-          :key="item.type"
-          draggable="true"
-          @dragstart="catalogDragStart($event, item)"
-          @dragend="endDrag"
-          @click="add(item)"
-        >
-          <i>{{ item.icon }}</i>
-          <span><b>{{ item.name }}</b><small>{{ item.desc }}</small></span>
-          <em>拖</em>
-        </button>
-      </div>
-      <div class="panel-tip">
-        <b>拖拽装修提示</b>
-        <p>组件可拖入手机任意位置；手机内模块和左侧图层都可以拖动交换位置。</p>
+        <div v-for="group in catalogGroups" :key="group.name" class="component-group">
+          <div class="component-group-title"><b>{{ group.name }}</b><span>{{ group.items.length }}</span></div>
+          <button
+            v-for="item in group.items"
+            :key="item.type"
+            draggable="true"
+            @dragstart="catalogDragStart($event, item)"
+            @dragend="endDrag"
+            @click="add(item)"
+          >
+            <i>{{ item.icon }}</i>
+            <span><b>{{ item.name }}</b><small>{{ item.desc }}</small></span>
+            <em>＋</em>
+          </button>
+        </div>
       </div>
     </section>
 
     <main class="canvas-panel">
       <div class="canvas-toolbar">
-        <div class="page-picker">
-          <small>正在装修</small>
-          <select v-model="pageId">
-            <option v-for="page in safePages" :key="page.id" :value="page.id">{{ page.name }}</option>
-          </select>
+        <div class="page-picker home-page-identity">
+          <i>首</i>
+          <div><small>正在装修</small><b>{{ currentPage.name }}</b></div>
           <span>{{ currentPage.path }}</span>
         </div>
-        <div class="device-switch">
-          <button class="active">手机预览</button>
-          <button @click="$emit('toast', '平板预览即将上线')">平板</button>
-        </div>
+        <div class="canvas-guide"><i></i>修改内容会实时显示在预览中</div>
       </div>
 
       <div class="canvas-area">
         <div class="block-rail">
-          <div class="rail-caption">页面图层 · 拖到模块上交换</div>
+          <div class="rail-caption"><b>首页楼层</b><span>{{ currentPage.blocks.length }} 个模块</span></div>
           <div
             v-for="(block, index) in currentPage.blocks"
             :key="block.id"
@@ -55,9 +49,10 @@
             @dragend="endDrag"
             @click="selectedId = block.id"
           >
-            <span>↕</span>
-            <b>{{ block.name }}</b>
-            <small>{{ railDropIndex === index && draggingType === 'block' ? '交换' : index + 1 }}</small>
+            <span class="rail-order">{{ String(index + 1).padStart(2, '0') }}</span>
+            <i>{{ catalogItem(block.type)?.icon || '□' }}</i>
+            <div><b>{{ block.name }}</b><small>{{ catalogItem(block.type)?.name || block.type }}</small></div>
+            <em :class="{ off: !block.visible }">{{ block.visible ? '显示' : '隐藏' }}</em>
           </div>
           <div
             class="rail-drop-end"
@@ -65,7 +60,7 @@
             @dragover.prevent="railDropIndex = currentPage.blocks.length"
             @drop.prevent="railDrop($event, null)"
           >
-            拖到此处置于底部
+            ＋ 拖到此处置于底部
           </div>
         </div>
 
@@ -83,9 +78,10 @@
 
     <section class="property-panel panel">
       <template v-if="selected">
-        <div class="panel-heading">
-          <div><b>组件设置</b><small>{{ selected.name }}</small></div>
-          <label class="toggle"><input type="checkbox" v-model="selected.visible"><i></i></label>
+        <div class="panel-heading property-heading">
+          <div class="selected-module-icon">{{ catalogItem(selected.type)?.icon || '□' }}</div>
+          <div><small>当前模块</small><b>{{ selected.name }}</b><em>{{ catalogItem(selected.type)?.name || selected.type }}</em></div>
+          <label class="toggle" title="显示或隐藏模块"><input type="checkbox" v-model="selected.visible"><i></i></label>
         </div>
 
         <div class="property-scroll">
@@ -162,27 +158,17 @@
               <button @click="selected.image = ''">移除图片</button>
             </div>
           </div>
-          <div class="field" v-if="selected.type === 'smart'">
-            <label>背景图片</label>
-            <input v-model.trim="selected.image" placeholder="可填 OBS 图片 URL；留空则使用背景色" />
-            <div v-if="selected.image" class="image-preview" :style="{ backgroundImage: `url('${selected.image}')` }">
-              <button @click="selected.image = ''">移除图片</button>
-            </div>
-            <p class="field-help">配置图片后会自动叠加蒙层；不填图片时使用下面的背景色。</p>
-          </div>
           <div class="field smart-setting" v-if="selected.type === 'smart'">
             <label>智能定制标识</label>
-            <input v-model="selected.icon" placeholder="左侧图标，留空则不显示" />
             <input v-model="selected.label" placeholder="上方标签，例如 AI 智能匹配" />
             <div class="two-mini-fields">
-              <span>图标色<ColorPicker v-model="selected.iconColor" /></span>
               <span>标签色<ColorPicker v-model="selected.labelColor" /></span>
+              <span>标题色<ColorPicker v-model="selected.titleColor" /></span>
             </div>
             <div class="two-mini-fields">
-              <span>标题色<ColorPicker v-model="selected.titleColor" /></span>
               <span>说明色<ColorPicker v-model="selected.textColor" /></span>
             </div>
-            <p class="field-help">如果背景图较深，可把标题色改成白色，左侧图标不需要时直接清空。</p>
+            <p class="field-help">智能定制模块固定使用纯色背景，可在下方调整背景色。</p>
           </div>
           <div class="field" v-if="selected.type === 'video'">
             <label>视频播放地址</label>
@@ -255,7 +241,6 @@
           <div class="field advanced-style">
             <label>模块细化样式</label>
             <div class="two-mini-fields">
-              <span>圆角<input type="number" min="0" max="60" v-model.number="selected.radius" placeholder="28"></span>
               <span>内边距<input type="number" min="0" max="60" v-model.number="selected.padding" placeholder="28"></span>
             </div>
             <div class="two-mini-fields">
@@ -308,20 +293,14 @@ import ColorPicker from './ColorPicker.vue'
 import { cloneDefault, componentCatalog } from '../data/defaultConfig'
 import { api } from '../services/api'
 
-const props = defineProps({ config: Object, activePage: String })
-const emit = defineEmits(['toast', 'dirty', 'page-change'])
+const props = defineProps({ config: Object })
+const emit = defineEmits(['toast', 'dirty'])
 
-const fallbackPages = cloneDefault().pages
-const safePages = computed(() => {
-  const pages = Array.isArray(props.config?.pages) && props.config.pages.length ? props.config.pages : fallbackPages
-  return pages.map((page, index) => ({
-    ...fallbackPages[index],
-    ...page,
-    blocks: Array.isArray(page?.blocks) && page.blocks.length ? page.blocks : (fallbackPages[index]?.blocks || fallbackPages[0].blocks),
-  }))
-})
-const pageId = ref(props.activePage || safePages.value[0]?.id)
-const selectedId = ref(safePages.value[0]?.blocks?.[0]?.id)
+const fallbackHome = cloneDefault().pages.find(page => page.id === 'home')
+if (!Array.isArray(props.config.pages)) props.config.pages = []
+if (!props.config.pages.some(page => page.id === 'home')) props.config.pages.unshift(fallbackHome)
+const currentPage = computed(() => props.config.pages.find(page => page.id === 'home') || fallbackHome)
+const selectedId = ref(currentPage.value.blocks?.[0]?.id)
 const draggingType = ref('')
 const railDropIndex = ref(-1)
 const drawStart = ref(null)
@@ -334,7 +313,6 @@ const routeModes = [
   { label: '双列卡片', value: 'grid' },
 ]
 const styleDefaults = {
-  radius: 28,
   padding: 28,
   titleColor: '#173f38',
   textColor: '#71807c',
@@ -359,7 +337,6 @@ const announcementSort = (a, b) => Number(!!b.pinned) - Number(!!a.pinned)
   || Number(Date.parse(b.published_at || b.updated_at || b.created_at || 0)) - Number(Date.parse(a.published_at || a.updated_at || a.created_at || 0))
   || Number(b.id || 0) - Number(a.id || 0)
 
-const currentPage = computed(() => safePages.value.find(page => page.id === pageId.value) || safePages.value[0])
 const selected = computed(() => currentPage.value?.blocks?.find(block => block.id === selectedId.value))
 const index = computed(() => currentPage.value?.blocks?.findIndex(block => block.id === selectedId.value) ?? -1)
 const gridEntries = computed(() => {
@@ -408,19 +385,18 @@ const syncNoticeAnnouncement = () => {
   selected.value.link = `/pages/notice/detail?id=${item.id}`
 }
 
-watch(pageId, () => {
-  selectedId.value = currentPage.value?.blocks?.[0]?.id
-  emit('page-change', pageId.value)
-})
-watch(() => props.activePage, value => {
-  if (value && value !== pageId.value) pageId.value = value
-})
 watch(() => props.config, () => emit('dirty'), { deep: true })
 
 const has = key => selected.value && Object.prototype.hasOwnProperty.call(selected.value, key)
 const catalogItem = type => componentCatalog.find(item => item.type === type)
+const catalogGroups = [
+  { name: '内容展示', types: ['banner', 'activity', 'video', 'notice'] },
+  { name: '业务服务', types: ['grid', 'study', 'smart', 'routes', 'schools', 'articles'] },
+  { name: '页面布局', types: ['spacer'] },
+].map(group => ({ ...group, items: group.types.map(catalogItem).filter(Boolean) }))
 const ensureBlockDefaults = block => {
   if (!block) return
+  delete block.radius
   Object.entries(styleDefaults).forEach(([key, value]) => {
     if (block[key] === undefined || block[key] === null || block[key] === '') block[key] = value
   })
@@ -431,9 +407,11 @@ const ensureBlockDefaults = block => {
     if (!Array.isArray(block.hotZones)) block.hotZones = defaultHotZones(block.link)
   }
   if (block.type === 'smart') {
-    if (!Object.prototype.hasOwnProperty.call(block, 'icon')) block.icon = '✦'
+    delete block.image
+    delete block.images
+    delete block.icon
+    delete block.iconColor
     if (!Object.prototype.hasOwnProperty.call(block, 'label')) block.label = 'AI 智能匹配'
-    if (!block.iconColor) block.iconColor = block.textColor || '#12a594'
     if (!block.labelColor) block.labelColor = block.textColor || '#12a594'
   }
   if (['routes', 'schools', 'articles'].includes(block.type) && !block.limit) block.limit = block.type === 'routes' ? 6 : 5
@@ -445,6 +423,7 @@ const ensureBlockDefaults = block => {
   }
   if (block.type === 'video' && !block.video_height) block.video_height = 330
 }
+currentPage.value.blocks?.forEach(ensureBlockDefaults)
 const addCarouselImage = () => {
   carouselImages.value.push('')
 }
@@ -546,7 +525,6 @@ const defaultBlock = item => {
     visible: true,
     title: item.name,
     subtitle: item.desc,
-    radius: 28,
     padding: 28,
     titleColor: '#173f38',
     textColor: '#71807c',
@@ -568,7 +546,7 @@ const defaultBlock = item => {
   if (item.type === 'activity') Object.assign(block, { button: '立即查看', progress: 50, background: '#fff5e9', link: '/pages/points/activity' })
   if (item.type === 'grid') Object.assign(block, { items: ['入口一', '入口二', '入口三'], gridItems: [{ icon: '📚', text: '入口一', link: '' }, { icon: '📄', text: '入口二', link: '' }, { icon: '🧭', text: '入口三', link: '' }], columns: 3 })
   if (item.type === 'study') Object.assign(block, { progress: 60, link: '/pages/study/index' })
-  if (item.type === 'smart') Object.assign(block, { button: '开始定制', icon: '✦', iconColor: '#12a594', label: 'AI 智能匹配', labelColor: '#12a594', image: '', background: '#dff5ef', link: '/pages/custom/params' })
+  if (item.type === 'smart') Object.assign(block, { button: '开始定制', label: 'AI 智能匹配', labelColor: '#128c7e', background: '#eef8f5', padding: 24, titleColor: '#173f38', textColor: '#60736e', shadow: 'soft', link: '/pages/custom/params' })
   if (item.type === 'routes') Object.assign(block, { title: '为你推荐', subtitle: '展示已上架路线', limit: 6, layout: 'scroll' })
   if (item.type === 'schools') Object.assign(block, { title: '入驻学校', subtitle: '展示已审核学校站点', limit: 5 })
   if (item.type === 'articles') Object.assign(block, { title: '推荐阅读', subtitle: '展示已发布文章', limit: 5, articleIds: [] })

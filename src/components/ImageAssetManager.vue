@@ -4,7 +4,7 @@
       <div>
         <span class="admin-grid-eyebrow">图片资源</span>
         <h1>图片资源</h1>
-        <p>统一查看客服图片、录取通知书等已上传图片；支持预览、打开原图、下载，并可配置用户上传图片的最大 MB 限制。</p>
+        <p>统一查看客服图片、学生证等已上传图片；支持预览、打开原图、下载，并可配置用户上传图片的最大 MB 限制。</p>
       </div>
       <button class="primary-btn compact" :disabled="loading" @click="load">{{ loading ? '刷新中...' : '刷新列表' }}</button>
     </div>
@@ -19,7 +19,7 @@
     <div class="admin-grid-setting-card">
       <div>
         <b>图片上传大小限制</b>
-        <span>控制客服图片、录取通知书等图片上传最大体积，保存后用户端和管理端上传都会按此限制校验。</span>
+        <span>控制客服图片、学生证等图片上传最大体积，保存后用户端和管理端上传都会按此限制校验。</span>
       </div>
       <label><input v-model.number="uploadSetting.max_image_mb" type="number" min="1" max="50"><em>MB</em></label>
       <button class="primary-btn compact" :disabled="savingSetting" @click="saveUploadSetting">{{ savingSetting ? '保存中...' : '保存限制' }}</button>
@@ -32,7 +32,7 @@
       </div>
       <div class="admin-grid-filters">
         <label><span>图片搜索</span><input v-model.trim="keyword" placeholder="文件名 / 路径 / object key"></label>
-        <label><span>来源</span><select v-model="filters.source" @change="load"><option value="">全部来源</option><option value="support">客服图片</option><option value="admission_notice">录取通知书</option></select></label>
+        <label><span>来源</span><select v-model="filters.source" @change="load"><option value="">全部来源</option><option value="support">客服图片</option><option value="student_card">学生证</option><option value="admission_notice">历史认证图片</option></select></label>
         <label><span>存储</span><select v-model="filters.storage" @change="load"><option value="">全部存储</option><option value="obs">华为云 OBS</option><option value="local">服务器本地</option></select></label>
       </div>
 
@@ -54,7 +54,7 @@
               <th></th>
               <th></th>
               <th><input class="filter-control" v-model.trim="nameFilter" placeholder="文件名"></th>
-              <th><select class="filter-control" v-model="sourceFilter"><option value="all">全部</option><option value="support">客服图片</option><option value="admission_notice">录取通知书</option><option value="graduation">录取通知书</option><option value="common">通用图片</option></select></th>
+              <th><select class="filter-control" v-model="sourceFilter"><option value="all">全部</option><option value="support">客服图片</option><option value="student_card">学生证</option><option value="admission_notice">历史认证图片</option><option value="graduation">历史认证图片</option><option value="common">通用图片</option></select></th>
               <th><select class="filter-control" v-model="storageFilter"><option value="all">全部</option><option value="obs">OBS</option><option value="local">本地</option></select></th>
               <th></th>
               <th></th>
@@ -126,8 +126,9 @@ watch(filtered, () => { page.value = 1 })
 
 const sourceText = source => ({
   support: '客服图片',
-  admission_notice: '录取通知书',
-  graduation: '录取通知书',
+  student_card: '学生证',
+  admission_notice: '历史认证图片',
+  graduation: '历史认证图片',
   common: '通用图片',
 }[source] || source || '图片')
 

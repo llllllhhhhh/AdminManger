@@ -174,8 +174,8 @@
         <textarea v-model.trim="contractRejectReason" placeholder="驳回时填写，例如：签名不清晰，请重新签署"></textarea>
 
         <div class="modal-actions" v-if="currentOrder?.contractStatus === TRAVEL_CONTRACT_STATUS.PENDING">
-          <button class="danger" @click="reviewContract(false)">驳回合同</button>
-          <button class="primary" @click="reviewContract(true)">通过合同</button>
+          <button class="danger" :disabled="contractReviewBusy" @click="reviewContract(false)">驳回合同</button>
+          <button class="primary" :disabled="contractReviewBusy" @click="reviewContract(true)">{{ contractReviewBusy ? '处理中...' : '通过合同' }}</button>
         </div>
         <div v-else class="contract-locked">当前合同状态：{{ contractText(currentOrder?.contractStatus) }}</div>
       </div>
@@ -190,6 +190,25 @@
             <h2>{{ currentOrder?.title }}</h2>
             <p>{{ currentOrder?.orderNo }} · {{ fulfillmentText(currentOrder?.fulfillmentStatus) }}</p>
           </div>
+        </div>
+
+        <div class="fulfillment-steps">
+          <article
+            v-for="step in fulfillmentSteps"
+            :key="step.key"
+            :class="{ done: step.done, active: step.active }"
+          >
+            <i>{{ step.index }}</i>
+            <div>
+              <b>{{ step.title }}</b>
+              <span>{{ step.desc }}</span>
+            </div>
+          </article>
+        </div>
+
+        <div :class="['fulfillment-tip', fulfillmentTip.tone]">
+          <b>{{ fulfillmentTip.title }}</b>
+          <p>{{ fulfillmentTip.desc }}</p>
         </div>
 
         <div class="request-box">
@@ -214,6 +233,13 @@
         <label>接送说明</label>
         <textarea v-model.trim="fulfillmentForm.pickup_notice" placeholder="集合说明、注意事项"></textarea>
 
+        <div
+          v-if="currentOrder?.fulfillmentStatus === TRAVEL_FULFILLMENT_STATUS.INFO_PENDING"
+          class="pending-box"
+        >
+          用户还没有提交接送信息。当前不能安排接送，可以先关闭弹窗，等待用户端在“我的旅行”里填写接送地址、紧急联系人和行李信息。
+        </div>
+
         <div v-if="currentOrder?.qrToken" class="checkin-box">
           <b>用户核销码</b>
           <p>{{ currentOrder.qrToken }}</p>
@@ -232,10 +258,11 @@
 
         <div class="modal-actions">
           <button @click="closeFulfillment">关闭</button>
-          <button v-if="canSavePickupSchedule" class="primary" :disabled="fulfillmentBusy" @click="schedulePickup">保存并通知用户确认</button>
-          <button v-if="isTravelCheckinPending(currentOrder?.fulfillmentStatus)" class="primary" :disabled="fulfillmentBusy" @click="issueQr">重置核销码</button>
+          <button v-if="canSavePickupSchedule" class="primary" :disabled="fulfillmentBusy" @click="schedulePickup">{{ currentOrder?.fulfillmentStatus === TRAVEL_FULFILLMENT_STATUS.PICKUP_CONFIRMED ? '更新接送安排' : '保存并通知用户确认' }}</button>
+          <button v-if="isTravelCheckinPending(currentOrder?.fulfillmentStatus)" class="primary" :disabled="fulfillmentBusy" @click="issueQr">生成或补发核销码</button>
           <button v-if="currentOrder?.fulfillmentStatus === TRAVEL_FULFILLMENT_STATUS.CHECKED_IN" class="primary" :disabled="fulfillmentBusy" @click="startTrip">开始行程</button>
           <button v-if="[TRAVEL_FULFILLMENT_STATUS.CHECKED_IN, TRAVEL_FULFILLMENT_STATUS.IN_TRIP].includes(currentOrder?.fulfillmentStatus)" class="primary" :disabled="fulfillmentBusy" @click="completeTrip">完成订单</button>
+          <button v-if="canAdminCancel" class="danger" :disabled="fulfillmentBusy" @click="cancelOrder">取消并退款</button>
           <button v-if="currentOrder?.fulfillmentStatus !== TRAVEL_FULFILLMENT_STATUS.COMPLETED" class="danger" :disabled="fulfillmentBusy" @click="markException">标记异常</button>
         </div>
       </div>
@@ -308,6 +335,7 @@ const savingTemplate = ref(false)
 const planError = ref('')
 const templateError = ref('')
 const fulfillmentBusy = ref(false)
+const contractReviewBusy = ref(false)
 const scanActive = ref(false)
 const checkinTokenInput = ref('')
 let scannerStream = null
@@ -367,6 +395,57 @@ const dashboardStats = computed(() => [
   { icon: '核', label: '待核销', count: orders.value.filter(isCheckinPending).length, tone: 'gray' },
   { icon: '总', label: '订单总数', count: orders.value.length, tone: '' },
 ])
+const fulfillmentStepIndex = computed(() => {
+  const status = currentOrder.value?.fulfillmentStatus
+  if (status === TRAVEL_FULFILLMENT_STATUS.COMPLETED) return 6
+  if (status === TRAVEL_FULFILLMENT_STATUS.IN_TRIP) return 5
+  if (status === TRAVEL_FULFILLMENT_STATUS.CHECKED_IN) return 4
+  if ([TRAVEL_FULFILLMENT_STATUS.USER_CONFIRMED, TRAVEL_FULFILLMENT_STATUS.QR_ISSUED].includes(status)) return 3
+  if (status === TRAVEL_FULFILLMENT_STATUS.PICKUP_CONFIRMED) return 2
+  if (status === TRAVEL_FULFILLMENT_STATUS.INFO_SUBMITTED) return 1
+  return 0
+})
+const fulfillmentSteps = computed(() => {
+  const active = fulfillmentStepIndex.value
+  return [
+    { key: 'info', index: '1', title: '用户填写接送信息', desc: '地址、联系人、人数、行李', active: active === 0 || active === 1, done: active > 1 },
+    { key: 'pickup', index: '2', title: '平台安排接送', desc: '时间、地点、司机和说明', active: active === 1 || active === 2, done: active > 2 },
+    { key: 'confirm', index: '3', title: '用户确认安排', desc: '确认后可发核销码', active: active === 2, done: active > 2 },
+    { key: 'checkin', index: '4', title: '出行核销', desc: '发码、扫码或手动核销', active: active === 3, done: active > 3 },
+    { key: 'complete', index: '5', title: '行程完成', desc: '开始行程并完成订单', active: active >= 4 && active < 6, done: active >= 6 },
+  ]
+})
+const fulfillmentTip = computed(() => {
+  const status = currentOrder.value?.fulfillmentStatus
+  if (status === TRAVEL_FULFILLMENT_STATUS.INFO_PENDING) {
+    return { tone: 'warn', title: '等待用户填写接送信息', desc: '合同已通过，但用户还没有提交接送地址和紧急联系人，平台暂时不能安排接送。' }
+  }
+  if (status === TRAVEL_FULFILLMENT_STATUS.INFO_SUBMITTED) {
+    return { tone: 'active', title: '现在可以安排接送', desc: '填写接送时间、地点、司机或接待人信息后保存，用户端会进入确认接送安排。' }
+  }
+  if (status === TRAVEL_FULFILLMENT_STATUS.PICKUP_CONFIRMED) {
+    return { tone: 'active', title: '等待用户确认接送', desc: '如接送信息有变化，可以在这里更新安排；用户确认后再生成核销码。' }
+  }
+  if (status === TRAVEL_FULFILLMENT_STATUS.USER_CONFIRMED) {
+    return { tone: 'active', title: '用户已确认，待生成核销码', desc: '点击“生成或补发核销码”，用户到达后可扫码或输入核销码完成核销。' }
+  }
+  if (status === TRAVEL_FULFILLMENT_STATUS.QR_ISSUED) {
+    return { tone: 'active', title: '待出行核销', desc: '扫码用户端二维码，或粘贴核销码后点击确认核销。' }
+  }
+  if (status === TRAVEL_FULFILLMENT_STATUS.CHECKED_IN) {
+    return { tone: 'success', title: '已核销', desc: '可以开始行程，或在行程结束后直接完成订单。' }
+  }
+  if (status === TRAVEL_FULFILLMENT_STATUS.IN_TRIP) {
+    return { tone: 'success', title: '行程中', desc: '行程结束后点击“完成订单”，订单会进入已完成。' }
+  }
+  if (status === TRAVEL_FULFILLMENT_STATUS.COMPLETED) {
+    return { tone: 'success', title: '订单已完成', desc: '该订单履约流程已经闭环。' }
+  }
+  if (status === TRAVEL_FULFILLMENT_STATUS.EXCEPTION) {
+    return { tone: 'danger', title: '订单异常', desc: currentOrder.value?.exceptionReason || '请根据异常原因线下处理后再决定是否取消或恢复。' }
+  }
+  return { tone: 'warn', title: '暂不可履约', desc: '请先确认合同已签署并通过审核。' }
+})
 const filtered = computed(() => {
   const key = keyword.value.toLowerCase()
   const type = typeFilter.value.toLowerCase()
@@ -383,7 +462,16 @@ const filtered = computed(() => {
 })
 const startIndex = computed(() => (page.value - 1) * pageSize.value)
 const pagedOrders = computed(() => filtered.value.slice(startIndex.value, startIndex.value + pageSize.value))
-const canSavePickupSchedule = computed(() => currentOrder.value?.fulfillmentStatus === TRAVEL_FULFILLMENT_STATUS.INFO_SUBMITTED)
+const canSavePickupSchedule = computed(() => [
+  TRAVEL_FULFILLMENT_STATUS.INFO_SUBMITTED,
+  TRAVEL_FULFILLMENT_STATUS.PICKUP_CONFIRMED,
+].includes(currentOrder.value?.fulfillmentStatus))
+const canAdminCancel = computed(() => currentOrder.value && ![
+  TRAVEL_FULFILLMENT_STATUS.CHECKED_IN,
+  TRAVEL_FULFILLMENT_STATUS.IN_TRIP,
+  TRAVEL_FULFILLMENT_STATUS.COMPLETED,
+  TRAVEL_FULFILLMENT_STATUS.CANCELLED,
+].includes(currentOrder.value.fulfillmentStatus))
 
 watch(filtered, () => { page.value = 1 })
 
@@ -567,12 +655,13 @@ const closeFulfillment = () => {
 
 const mergeTravelOrder = saved => {
   const mapped = mapOrder(saved)
-  const id = currentOrder.value?.id || mapped.id
-  const index = orders.value.findIndex(item => item.id === id)
+  const index = orders.value.findIndex(item => item.id === mapped.id)
   if (index >= 0) orders.value.splice(index, 1, mapped)
-  currentOrder.value = mapped
-  checkinTokenInput.value = mapped.qrToken || ''
-  fillFulfillmentForm(mapped)
+  if (currentOrder.value?.id === mapped.id) {
+    currentOrder.value = mapped
+    checkinTokenInput.value = mapped.qrToken || ''
+    fillFulfillmentForm(mapped)
+  }
   return mapped
 }
 
@@ -723,6 +812,22 @@ const completeTrip = async () => {
   }
 }
 
+const cancelOrder = async () => {
+  if (!currentOrder.value || fulfillmentBusy.value) return
+  const reason = window.prompt('请输入取消原因', '平台协商取消') || ''
+  if (reason.trim().length < 2) return
+  fulfillmentBusy.value = true
+  try {
+    const saved = await api.cancelTravelOrder(currentOrder.value.rawId, reason.trim())
+    mergeTravelOrder(saved)
+    emit('toast', saved.points_refunded ? '订单已取消，积分与库存已恢复' : '订单已取消')
+  } catch (error) {
+    emit('toast', error.message || '取消订单失败')
+  } finally {
+    fulfillmentBusy.value = false
+  }
+}
+
 const markException = async () => {
   if (!currentOrder.value || fulfillmentBusy.value) return
   const reason = window.prompt('请输入异常原因', currentOrder.value.exceptionReason || '用户未到 / 接送变更') || ''
@@ -785,23 +890,28 @@ const saveTemplate = async () => {
 }
 
 const reviewContract = async approved => {
-  if (!currentOrder.value) return
+  if (!currentOrder.value || contractReviewBusy.value) return
   if (!approved && !contractRejectReason.value.trim()) {
     emit('toast', '驳回合同时请填写原因')
     return
   }
+  const orderId = currentOrder.value.id
+  const rawId = currentOrder.value.rawId
+  contractReviewBusy.value = true
   try {
-    const saved = await api.reviewOrderContract(currentOrder.value.rawId, {
+    const saved = await api.reviewOrderContract(rawId, {
       approved,
       reject_reason: approved ? '' : contractRejectReason.value,
     })
     const mapped = mapOrder(saved)
-    const index = orders.value.findIndex(item => item.id === currentOrder.value.id)
+    const index = orders.value.findIndex(item => item.id === orderId)
     if (index >= 0) orders.value.splice(index, 1, mapped)
     emit('toast', approved ? '合同已审核通过' : '合同已驳回')
     closeContract()
   } catch (error) {
     emit('toast', error.message || '合同审核失败')
+  } finally {
+    contractReviewBusy.value = false
   }
 }
 
@@ -980,6 +1090,130 @@ onMounted(() => {
   border-radius: 20px;
   background: #f6faf8;
   margin-bottom: 18px;
+}
+
+.fulfillment-steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.fulfillment-steps article {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #e3ebe8;
+  border-radius: 18px;
+  background: #fbfdfc;
+  color: #7a8a86;
+}
+
+.fulfillment-steps article i {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #edf4f1;
+  color: #60736e;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.fulfillment-steps article b,
+.fulfillment-steps article span {
+  display: block;
+}
+
+.fulfillment-steps article b {
+  color: #213f39;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.fulfillment-steps article span {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.fulfillment-steps article.done {
+  border-color: #bde7d9;
+  background: #f2fbf7;
+}
+
+.fulfillment-steps article.done i {
+  background: #16a085;
+  color: #fff;
+}
+
+.fulfillment-steps article.active {
+  border-color: #ffb779;
+  background: #fff8f1;
+  box-shadow: 0 12px 30px rgba(232, 111, 39, .12);
+}
+
+.fulfillment-steps article.active i {
+  background: #ff7a35;
+  color: #fff;
+}
+
+.fulfillment-tip,
+.pending-box {
+  padding: 14px 16px;
+  border-radius: 18px;
+  margin-bottom: 16px;
+  border: 1px solid #dfe9e5;
+}
+
+.fulfillment-tip b,
+.fulfillment-tip p {
+  display: block;
+  margin: 0;
+}
+
+.fulfillment-tip b {
+  color: #173f38;
+  font-size: 15px;
+}
+
+.fulfillment-tip p {
+  margin-top: 6px;
+  color: #5f716c;
+  line-height: 1.6;
+}
+
+.fulfillment-tip.active {
+  border-color: #ffd3ad;
+  background: #fff8f1;
+}
+
+.fulfillment-tip.warn,
+.pending-box {
+  border-color: #f0d9a8;
+  background: #fffbef;
+  color: #80612b;
+}
+
+.fulfillment-tip.success {
+  border-color: #bde7d9;
+  background: #effaf6;
+}
+
+.fulfillment-tip.danger {
+  border-color: #f2c0b7;
+  background: #fff4f2;
+}
+
+.pending-box {
+  margin-top: 16px;
+  font-weight: 800;
+  line-height: 1.6;
 }
 
 .request-box p {
@@ -1174,6 +1408,12 @@ onMounted(() => {
   justify-content: flex-start;
   margin-top: 12px;
   flex-wrap: wrap;
+}
+
+@media (max-width: 900px) {
+  .fulfillment-steps {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
 

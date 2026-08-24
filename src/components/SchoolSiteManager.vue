@@ -218,7 +218,12 @@ function createEmpty() {
 }
 
 const load = async () => {
-  list.value = await api.getSchools()
+  try {
+    list.value = await api.getSchools()
+  } catch (error) {
+    list.value = []
+    emit('toast', error.message || '入驻学校加载失败')
+  }
 }
 
 const openCreate = () => {

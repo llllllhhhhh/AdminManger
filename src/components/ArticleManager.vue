@@ -140,7 +140,7 @@ const templates = [
     slug: 'privacy-policy',
     category: '协议规则',
     summary: '说明平台如何收集、使用和保护手机号、客服记录、认证资料等信息。',
-    content: '学徒行重视你的隐私与信息安全。\n\n1. 我们会根据功能需要收集手机号、昵称、学习偏好、订单信息、客服聊天记录和录取通知书认证资料。\n2. 上述信息主要用于账号识别、注册审核、积分发放、客服沟通、订单预约和权益认证。\n3. 录取通知书等敏感图片仅用于认证审核，不会用于无关用途。\n4. 你可以通过客服或平台提供的功能申请修改密码、注销账号或咨询个人信息处理情况。\n5. 我们会采取合理安全措施保护数据，但请你也妥善保管账号密码。',
+    content: '学徒行重视你的隐私与信息安全。\n\n1. 我们会根据功能需要收集手机号、昵称、学习偏好、订单信息、客服聊天记录和学生证认证资料。\n2. 上述信息主要用于账号识别、注册审核、积分发放、客服沟通、订单预约和权益认证。\n3. 学生证等敏感图片仅用于认证审核，不会用于无关用途。\n4. 你可以通过客服或平台提供的功能申请修改密码、注销账号或咨询个人信息处理情况。\n5. 我们会采取合理安全措施保护数据，但请你也妥善保管账号密码。',
   },
   {
     title: '关于学徒行',
@@ -179,7 +179,12 @@ watch(filtered, () => { page.value = 1 })
 const formatTime = value => (value ? String(value).replace('T', ' ').slice(0, 16) : '未发布')
 
 const load = async () => {
-  list.value = await api.getArticles()
+  try {
+    list.value = await api.getArticles()
+  } catch (error) {
+    list.value = []
+    emit('toast', error.message || '文章列表加载失败')
+  }
 }
 
 const openCreate = () => {

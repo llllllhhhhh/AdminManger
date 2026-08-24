@@ -1,6 +1,5 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 const WS_BASE = import.meta.env.VITE_WS_BASE_URL || ''
-const ADMIN_KEY = import.meta.env.VITE_ADMIN_API_KEY || 'xuetuxing-dev-key'
 const TOKEN_KEY = 'xuetuxing-admin-token'
 const USER_KEY = 'xuetuxing-admin-user'
 
@@ -45,10 +44,7 @@ function buildHeaders(options = {}, admin = true) {
   const headers = { ...(options.headers || {}) }
   const token = getAdminToken()
   if (!(options.body instanceof FormData) && !headers['Content-Type']) headers['Content-Type'] = 'application/json'
-  if (admin) {
-    if (token) headers.Authorization = `Bearer ${token}`
-    else headers['X-Admin-Key'] = ADMIN_KEY
-  }
+  if (admin && token) headers.Authorization = `Bearer ${token}`
   return headers
 }
 
@@ -67,6 +63,8 @@ async function request(path, options = {}, admin = true) {
 export const api = {
   health: () => fetch(`${API_BASE.replace('/api/v1', '')}/health`).then(r => r.json()),
   adminLogin: payload => request('/auth/admin/login', { method: 'POST', body: JSON.stringify(payload) }, false),
+  getSliderCaptcha: () => request(`/auth/slider-captcha?_t=${Date.now()}`, {}, false),
+  verifySliderCaptcha: payload => request('/auth/slider-captcha/verify', { method: 'POST', body: JSON.stringify(payload) }, false),
   adminMe: () => request('/auth/admin/me'),
   getDraft: () => request('/admin/decoration/draft'),
   saveDraft: content => request('/admin/decoration/draft', { method: 'PUT', body: JSON.stringify(content) }),
@@ -82,6 +80,11 @@ export const api = {
   },
   getTravelMatchSettings: () => request('/admin/travel-match/settings'),
   saveTravelMatchSettings: payload => request('/admin/travel-match/settings', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  }),
+  getSliderCaptchaSettings: () => request('/admin/slider-captcha/settings'),
+  saveSliderCaptchaSettings: payload => request('/admin/slider-captcha/settings', {
     method: 'PUT',
     body: JSON.stringify(payload),
   }),
@@ -125,6 +128,8 @@ export const api = {
   checkInOrder: (id, token) => request(`/admin/orders/${id}/check-in?token=${encodeURIComponent(token)}`, { method: 'PATCH' }),
   startOrderTrip: id => request(`/admin/orders/${id}/trip/start`, { method: 'PATCH' }),
   completeOrder: id => request(`/admin/orders/${id}/complete`, { method: 'PATCH' }),
+  cancelTravelOrder: (id, reason) => request(`/admin/orders/${id}/cancel`, { method: 'PATCH', body: JSON.stringify({ reason }) }),
+  getTravelOrderAudit: id => request(`/admin/orders/${id}/audit`),
   markOrderException: (id, reason) => request(`/admin/orders/${id}/exception`, { method: 'PATCH', body: JSON.stringify({ reason }) }),
   getCustomTravelRequests: () => request('/admin/custom-travel/requests'),
   reviewCustomTravelRequest: (id, payload) => request(`/admin/custom-travel/requests/${id}/review`, {
@@ -177,7 +182,7 @@ export const api = {
 }
 
 export const getSupportWebSocketUrl = id => {
-  const token = getAdminToken() || ADMIN_KEY
+  const token = getAdminToken()
   const wsBase = WS_BASE || (API_BASE.startsWith('http')
     ? API_BASE.replace(/^http/, 'ws')
     : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}${API_BASE}`)
