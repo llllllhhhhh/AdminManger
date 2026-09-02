@@ -181,7 +181,7 @@
               <th class="check-col"></th>
               <th colspan="2">订单信息</th>
               <th colspan="2">商户信息</th>
-              <th colspan="4">支付信息</th>
+              <th colspan="5">支付信息</th>
             </tr>
             <tr class="column-head">
               <th class="row-num">#</th>
@@ -194,6 +194,7 @@
               <th>方式 <button @click="openMenu('payment_method')">⋮</button></th>
               <th>状态 <button @click="openMenu('payment_status')">⋮</button></th>
               <th>下单时间 <button @click="openMenu('created_at')">⋮</button></th>
+              <th>操作</th>
             </tr>
             <tr class="filter-row">
               <th></th>
@@ -203,13 +204,14 @@
               <th><input v-model.trim="merchantKeyword" placeholder="商户名"><i>⌕</i></th>
               <th><input v-model.trim="merchantAccountKeyword" placeholder="账号"><i>⌕</i></th>
               <th><input v-model.trim="amountFilter" placeholder="≥ 金额"></th>
-              <th><select v-model="paymentMethodFilter"><option value="all">全部</option><option value="wechat">微信支付</option><option value="mock">开发模拟</option></select></th>
+              <th><select v-model="paymentMethodFilter"><option value="all">全部</option><option value="wechat">微信支付</option><option value="balance">账户余额</option><option value="mock">开发模拟</option></select></th>
               <th><select v-model="payFilter"><option value="all">全部</option><option value="pending">待支付</option><option value="paid">已支付</option><option value="canceled">已取消</option><option value="refunded">已退款</option></select></th>
+              <th></th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(order, index) in pagedOrders" :key="order.id">
+            <tr v-for="(order, index) in pagedOrders" :key="`${order.source}-${order.id}`">
               <td class="row-num">{{ orderStartIndex + index + 1 }}</td>
               <td class="check-col"><input type="checkbox" :checked="selectedOrders.has(order.id)" @change="toggleOrderCheck(order.id)"></td>
               <td class="main-cell order-main">
@@ -223,9 +225,24 @@
               <td><b>{{ schoolName(order.school_id) }}</b><small>ID：{{ order.school_id || '平台' }}</small></td>
               <td><small>{{ merchantAccount(order.school_id) }}</small></td>
               <td><strong class="money">￥{{ order.amount }}</strong></td>
-              <td>{{ order.payment_method === 'mock' ? '开发模拟' : '微信支付' }}</td>
-              <td><span class="pay-status" :class="order.payment_status">{{ payName(order.payment_status) }}</span></td>
+              <td>{{ paymentMethodName(order.payment_method) }}</td>
+              <td>
+                <span class="pay-status" :class="order.refund_status || order.payment_status">{{ order.refund_status === 'processing' ? '退款处理中' : payName(order.payment_status) }}</span>
+                <small v-if="order.refund_no">{{ order.refund_no }}</small>
+              </td>
               <td>{{ formatTime(order.created_at) }}</td>
+              <td>
+                <div class="table-actions">
+                  <button
+                    v-if="order.source === 'standard' && order.payment_status === COMMERCE_PAYMENT_STATUS.PAID"
+                    class="danger-lite"
+                    :disabled="refundBusy === order.id"
+                    @click="refundOrder(order)"
+                  >
+                    {{ refundBusy === order.id ? '同步中...' : order.refund_status === 'processing' ? '同步退款状态' : '原路退款' }}
+                  </button>
+                </div>
+              </td>
             </tr>
           </tbody>
           </table>
@@ -355,6 +372,7 @@ const selectedOrders = ref(new Set())
 const editing = ref(null)
 const rejecting = ref(null)
 const saving = ref(false)
+const refundBusy = ref(null)
 const rejectReason = ref('')
 const productPage = ref(1)
 const orderPage = ref(1)
@@ -395,6 +413,7 @@ const typeName = value => ({ community: '付费社群', package: '长期套餐',
 const reviewName = value => reviewStatusName(value)
 const cycleName = value => ({ month: '按月', year: '按年', once: '一次性' }[value] || value)
 const payName = value => paymentStatusName(value)
+const paymentMethodName = value => ({ wechat: '微信支付', balance: '账户余额', mock: '开发模拟' }[value] || value || '-')
 const formatTime = value => value ? new Date(value).toLocaleString() : '-'
 const coverStyle = cover => `linear-gradient(135deg,rgba(17,61,55,.18),rgba(17,61,55,.58)),url(${cover || fallbackCover})`
 const numberAtLeast = (value, filter) => filter === '' || Number(value || 0) >= Number(filter || 0)
@@ -551,13 +570,22 @@ const toggleAllOrders = () => {
 
 const load = async () => {
   try {
-    const [productRows, orderRows, schoolRows] = await Promise.all([
+    const [productRows, legacyOrderRows, standardOrderRows, schoolRows] = await Promise.all([
       api.getStudyProducts(),
       api.getStudyOrders(),
+      api.getCommerceOrders(),
       api.getSchools(),
     ])
     products.value = productRows
-    orders.value = orderRows
+    const legacyOrders = (legacyOrderRows || []).map(order => ({ ...order, source: 'legacy' }))
+    const standardOrders = (standardOrderRows || []).map(order => ({
+      ...order,
+      source: 'standard',
+      product_id: order.items?.[0]?.product_id || 0,
+      product_name: (order.items || []).map(item => item.product_name).filter(Boolean).join('、') || '学习服务订单',
+      amount: order.payable_amount ?? order.total_amount ?? 0,
+    }))
+    orders.value = [...standardOrders, ...legacyOrders].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
     schools.value = schoolRows
   } catch (error) {
     emit('toast', error.message)
@@ -618,6 +646,20 @@ const toggle = async item => {
   }
 }
 
+const refundOrder = async order => {
+  if (!window.confirm(`确认对订单 ${order.order_no} 发起原路退款？`)) return
+  refundBusy.value = order.id
+  try {
+    const result = await api.refundCommerceOrder(order.order_no)
+    await load()
+    emit('toast', result.status === 'processing' ? '微信退款已提交，等待微信处理' : '退款已完成')
+  } catch (error) {
+    emit('toast', error.message)
+  } finally {
+    refundBusy.value = null
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -666,6 +708,7 @@ onMounted(load)
   max-height:min(720px,calc(100vh - 220px));
   background:#fff;
 }
+
 .table-panel .table-viewport{
   flex:1 1 auto;
   min-height:0;
@@ -682,6 +725,10 @@ onMounted(load)
 }
 .table-footer :deep(.pagination-bar){
   border-top:0;
+}
+.pay-status.processing{
+  background:#fff0dd;
+  color:#ad6800;
 }
 
 </style>

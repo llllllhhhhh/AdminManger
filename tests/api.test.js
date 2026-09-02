@@ -51,4 +51,17 @@ describe('admin api', () => {
     expect(resolveApiAssetThumbUrl('/api/v1/public/assets/12/file')).toBe('/api/v1/public/assets/12/thumb')
     expect(resolveApiAssetThumbUrl('/uploads/support/a.png')).toContain('/api/v1/public/assets/object-thumb/support/a.png')
   })
+
+  it('loads standard orders and starts an original-channel refund', async () => {
+    fetch.mockResolvedValueOnce(response([]))
+    await api.getCommerceOrders()
+    expect(fetch).toHaveBeenLastCalledWith('/api/v1/admin/commerce/orders', expect.any(Object))
+
+    fetch.mockResolvedValueOnce(response({ status: 'processing' }))
+    await api.refundCommerceOrder('XO TEST 1')
+    expect(fetch).toHaveBeenLastCalledWith(
+      '/api/v1/admin/commerce/orders/XO%20TEST%201/refund',
+      expect.objectContaining({ method: 'POST' }),
+    )
+  })
 })

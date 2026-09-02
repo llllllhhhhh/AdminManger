@@ -169,6 +169,8 @@ export const api = {
   }),
   setStudyProductStatus: (id, enabled) => request(`/admin/study/products/${id}/status?enabled=${enabled}`, { method: 'PATCH' }),
   getStudyOrders: () => request('/admin/study/orders'),
+  getCommerceOrders: () => request('/admin/commerce/orders'),
+  refundCommerceOrder: orderNo => request(`/admin/commerce/orders/${encodeURIComponent(orderNo)}/refund`, { method: 'POST' }),
   getSupportConversations: () => request('/support/admin/conversations'),
   getSupportMessages: id => request(`/support/admin/conversations/${id}/messages`),
   closeSupportConversation: id => request(`/support/admin/conversations/${id}/close`, { method: 'PATCH' }),
