@@ -227,8 +227,9 @@
               <td><strong class="money">￥{{ order.amount }}</strong></td>
               <td>{{ paymentMethodName(order.payment_method) }}</td>
               <td>
-                <span class="pay-status" :class="order.refund_status || order.payment_status">{{ order.refund_status === 'processing' ? '退款处理中' : payName(order.payment_status) }}</span>
-                <small v-if="order.refund_no">{{ order.refund_no }}</small>
+                <span class="pay-status" :class="order.refund_status || order.payment_status">{{ refundStatusText(order) }}</span>
+                <small v-if="order.refund_reason">{{ order.refund_reason }}</small>
+                <small v-else-if="order.refund_no">{{ order.refund_no }}</small>
               </td>
               <td>{{ formatTime(order.created_at) }}</td>
               <td>
@@ -239,7 +240,7 @@
                     :disabled="refundBusy === order.id"
                     @click="refundOrder(order)"
                   >
-                    {{ refundBusy === order.id ? '同步中...' : order.refund_status === 'processing' ? '同步退款状态' : '原路退款' }}
+                    {{ refundBusy === order.id ? '处理中...' : order.refund_status === 'requested' ? '处理退款申请' : order.refund_status === 'processing' ? '同步退款状态' : '原路退款' }}
                   </button>
                 </div>
               </td>
@@ -414,6 +415,7 @@ const reviewName = value => reviewStatusName(value)
 const cycleName = value => ({ month: '按月', year: '按年', once: '一次性' }[value] || value)
 const payName = value => paymentStatusName(value)
 const paymentMethodName = value => ({ wechat: '微信支付', balance: '账户余额', mock: '开发模拟' }[value] || value || '-')
+const refundStatusText = order => ({ requested: '退款申请', processing: '退款处理中', abnormal: '退款异常', closed: '退款关闭' }[order.refund_status] || payName(order.payment_status))
 const formatTime = value => value ? new Date(value).toLocaleString() : '-'
 const coverStyle = cover => `linear-gradient(135deg,rgba(17,61,55,.18),rgba(17,61,55,.58)),url(${cover || fallbackCover})`
 const numberAtLeast = (value, filter) => filter === '' || Number(value || 0) >= Number(filter || 0)
@@ -726,7 +728,7 @@ onMounted(load)
 .table-footer :deep(.pagination-bar){
   border-top:0;
 }
-.pay-status.processing{
+.pay-status.requested,.pay-status.processing{
   background:#fff0dd;
   color:#ad6800;
 }
