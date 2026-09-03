@@ -394,6 +394,7 @@ const catalogGroups = [
   { name: '业务服务', types: ['grid', 'study', 'smart', 'routes', 'schools', 'articles'] },
   { name: '页面布局', types: ['spacer'] },
 ].map(group => ({ ...group, items: group.types.map(catalogItem).filter(Boolean) }))
+const defaultHotZones = link => [{ name: '整图跳转', x: 0, y: 0, w: 100, h: 100, link: link || '' }]
 const ensureBlockDefaults = block => {
   if (!block) return
   delete block.radius
@@ -431,7 +432,6 @@ const removeCarouselImage = index => {
   carouselImages.value.splice(index, 1)
   if (selected.value) selected.value.image = carouselImages.value[0] || ''
 }
-const defaultHotZones = link => [{ name: '整图跳转', x: 0, y: 0, w: 100, h: 100, link: link || '' }]
 const addHotZone = () => {
   hotZones.value.push({ name: `区域${hotZones.value.length + 1}`, x: 0, y: 0, w: 50, h: 50, link: selected.value?.link || '' })
 }

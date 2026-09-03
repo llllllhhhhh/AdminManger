@@ -6,6 +6,10 @@ const apiMock = vi.hoisted(() => ({
   getSliderCaptcha: vi.fn(),
   verifySliderCaptcha: vi.fn(),
   adminLogin: vi.fn(),
+  adminMe: vi.fn(),
+  getDraft: vi.fn(),
+  getRoutes: vi.fn(),
+  getPointRule: vi.fn(),
 }))
 
 vi.mock('../src/services/api', async importOriginal => ({
@@ -15,10 +19,14 @@ vi.mock('../src/services/api', async importOriginal => ({
 
 import App from '../src/App.vue'
 import AnnouncementManager from '../src/components/AnnouncementManager.vue'
+import Decorator from '../src/components/Decorator.vue'
 import SliderCaptcha from '../src/components/SliderCaptcha.vue'
 
 describe('admin component smoke tests', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+  })
 
   it('renders an empty announcement state', async () => {
     apiMock.getAnnouncements.mockResolvedValue([])
@@ -77,5 +85,31 @@ describe('admin component smoke tests', () => {
 
     expect(wrapper.find('.slider-modal-mask').exists()).toBe(true)
     expect(apiMock.adminLogin).not.toHaveBeenCalled()
+  })
+
+  it('asks once when leaving dirty decoration and then allows normal navigation', async () => {
+    localStorage.setItem('xuetuxing-admin-token', 'admin-token')
+    localStorage.setItem('xuetuxing-admin-user', JSON.stringify({ id: 1, nickname: '管理员' }))
+    apiMock.adminMe.mockResolvedValue({ id: 1, nickname: '管理员' })
+    apiMock.getDraft.mockResolvedValue({ content: {} })
+    apiMock.getRoutes.mockResolvedValue([])
+    apiMock.getPointRule.mockResolvedValue({})
+    const confirmMock = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const wrapper = mount(App)
+    await flushPromises()
+
+    const navButton = text => wrapper.findAll('nav button').find(button => button.text().includes(text))
+    await navButton('首页装修').trigger('click')
+    await flushPromises()
+    wrapper.findComponent(Decorator).vm.$emit('dirty')
+    await flushPromises()
+
+    await navButton('合同管理').trigger('click')
+    await flushPromises()
+    await navButton('入驻学校').trigger('click')
+    await flushPromises()
+
+    expect(confirmMock).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('.breadcrumb b').text()).toBe('入驻学校')
   })
 })

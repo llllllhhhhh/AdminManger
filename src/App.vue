@@ -94,11 +94,11 @@
       </div>
 
       <Dashboard v-if="view === 'dashboard'" :config="config" @navigate="navigate" />
-      <Decorator v-else-if="view === 'decorator'" :config="config" @toast="toast" @dirty="dirty = true" />
+      <Decorator v-else-if="view === 'decorator'" :config="config" @toast="toast" @dirty="markDirty('decorator')" />
       <BrandSettings v-else-if="view === 'brand'" :config="config" @save="save" />
       <RouteManager v-else-if="view === 'routes'" :config="config" @toast="toast" />
       <TravelMatchSettings v-else-if="view === 'travelMatch'" @toast="toast" />
-      <OnboardingSettings v-else-if="view === 'onboarding'" :config="config" @save="save" @publish="publish" @dirty="dirty = true" @toast="toast" />
+      <OnboardingSettings v-else-if="view === 'onboarding'" :config="config" @save="save" @publish="publish" @dirty="markDirty('onboarding')" @toast="toast" />
       <SliderCaptchaSettings v-else-if="view === 'sliderCaptcha'" @toast="toast" />
       <AnnouncementManager v-else-if="view === 'announcements'" @toast="toast" />
       <ArticleManager v-else-if="view === 'articles'" @toast="toast" />
@@ -168,6 +168,8 @@ const config = ref(readSavedConfig())
 const view = ref('dashboard')
 const collapsed = ref(false)
 const dirty = ref(false)
+const dirtyOwner = ref('')
+const editorBaseline = ref('')
 const toastText = ref('')
 const showImport = ref(false)
 const importText = ref('')
@@ -200,14 +202,34 @@ const toast = text => {
   toastTimer = setTimeout(() => { toastText.value = '' }, 2200)
 }
 
+const editableViews = new Set(['decorator', 'onboarding'])
+const snapshotConfig = () => JSON.stringify(config.value)
+const markDirty = owner => {
+  if (view.value !== owner) return
+  dirty.value = true
+  dirtyOwner.value = owner
+}
+
+const resetDirtyState = () => {
+  dirty.value = false
+  dirtyOwner.value = ''
+}
+
 const navigate = target => {
   if (target === view.value) return
-  if (dirty.value && !confirm('当前装修修改尚未保存，确认离开吗？')) return
+  if (dirty.value && dirtyOwner.value === view.value) {
+    if (!confirm('当前装修修改尚未保存，确认离开吗？')) return
+    if (editorBaseline.value) config.value = mergeDefaultConfig(JSON.parse(editorBaseline.value))
+    resetDirtyState()
+  } else if (dirty.value) {
+    resetDirtyState()
+  }
+  if (editableViews.has(target)) editorBaseline.value = snapshotConfig()
   view.value = target
 }
 
 const warnBeforeUnload = event => {
-  if (!dirty.value) return
+  if (!dirty.value || dirtyOwner.value !== view.value) return
   event.preventDefault()
   event.returnValue = ''
 }
@@ -269,21 +291,23 @@ const save = async () => {
   localStorage.setItem('xuetuxing-admin-config', JSON.stringify(config.value))
   await api.saveDraft(config.value)
   await api.savePointRule(pointPayload())
-  dirty.value = false
+  editorBaseline.value = snapshotConfig()
+  resetDirtyState()
   toast('草稿已保存')
 }
 
 const publish = async () => {
   await api.publish(config.value)
   await api.savePointRule(pointPayload())
-  dirty.value = false
+  editorBaseline.value = snapshotConfig()
+  resetDirtyState()
   toast('已发布到用户端')
 }
 
 const resetConfig = () => {
   if (!confirm('确认恢复默认配置吗？')) return
   config.value = cloneDefault()
-  dirty.value = true
+  markDirty(view.value)
 }
 
 const exportConfig = () => {
@@ -301,7 +325,7 @@ const importConfig = () => {
     const next = JSON.parse(importText.value)
     if (!next.brand || !Array.isArray(next.pages)) throw new Error('invalid')
     config.value = mergeDefaultConfig(next)
-    dirty.value = true
+    markDirty(view.value)
     showImport.value = false
     toast('配置导入成功')
   } catch {
